@@ -1,0 +1,11 @@
+# Runtime/user-generated content — see README for why these dirs exist
+/storage/*
+!/storage/.gitkeep
+/uploads/logos/*
+!/uploads/logos/.gitkeep
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
