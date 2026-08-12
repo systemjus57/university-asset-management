@@ -8,7 +8,7 @@ $roleId = $_GET['role_id'] ?? '';
 $where  = [];
 $params = [];
 if ($q !== '') {
-    $where[] = '(u.name LIKE :q OR u.email LIKE :q)';
+    $where[] = '(u.name LIKE :q OR u.email LIKE :q OR u.username LIKE :q)';
     $params['q'] = "%$q%";
 }
 if ($roleId !== '') {
@@ -41,7 +41,7 @@ include __DIR__ . '/../../includes/layout/header.php';
 <form method="get" class="filter-bar">
     <div class="form-group">
         <label for="q">Search</label>
-        <input type="search" id="q" name="q" placeholder="Name or email" value="<?= e($q) ?>">
+        <input type="search" id="q" name="q" placeholder="Name, email, or username" value="<?= e($q) ?>">
     </div>
     <div class="form-group">
         <label for="role_id">Role</label>
@@ -61,6 +61,7 @@ include __DIR__ . '/../../includes/layout/header.php';
         <tr>
             <th data-sort>Name</th>
             <th data-sort>Email</th>
+            <th data-sort>Username</th>
             <th data-sort>Role</th>
             <th data-sort>Department</th>
             <th data-sort>Status</th>
@@ -68,11 +69,12 @@ include __DIR__ . '/../../includes/layout/header.php';
         </tr>
     </thead>
     <tbody>
-    <?php if (!$users): ?><tr class="empty-row"><td colspan="6">No users found.</td></tr><?php endif; ?>
+    <?php if (!$users): ?><tr class="empty-row"><td colspan="7">No users found.</td></tr><?php endif; ?>
     <?php foreach ($users as $u): ?>
         <tr>
             <td><?= e($u['name']) ?></td>
             <td><?= e($u['email']) ?></td>
+            <td><?= e($u['username']) ?></td>
             <td><?= e($u['role_name']) ?></td>
             <td><?= e($u['department_name'] ?? '—') ?></td>
             <td><?= statusBadge($u['status']) ?></td>

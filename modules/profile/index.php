@@ -15,26 +15,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $formType = $_POST['form_type'] ?? '';
 
     if ($formType === 'profile') {
-        $name  = clean($_POST['name'] ?? '');
-        $email = clean($_POST['email'] ?? '');
+        $name     = clean($_POST['name'] ?? '');
+        $email    = clean($_POST['email'] ?? '');
+        $username = clean($_POST['username'] ?? '');
 
-        if ($name === '' || $email === '') {
-            $errors[] = 'Name and email are required.';
+        if ($name === '' || $email === '' || $username === '') {
+            $errors[] = 'Name, email, and username are required.';
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $errors[] = 'Enter a valid email address.';
+        } elseif (!preg_match('/^[a-zA-Z0-9._-]{3,50}$/', $username)) {
+            $errors[] = 'Username must be 3-50 characters, using letters, numbers, dots, underscores, or hyphens only.';
         } else {
             $check = $pdo->prepare('SELECT 1 FROM users WHERE email = :email AND user_id != :id');
             $check->execute(['email' => $email, 'id' => $userId]);
             if ($check->fetch()) {
                 $errors[] = 'Another account already uses this email.';
             }
+            $check = $pdo->prepare('SELECT 1 FROM users WHERE username = :username AND user_id != :id');
+            $check->execute(['username' => $username, 'id' => $userId]);
+            if ($check->fetch()) {
+                $errors[] = 'Another account already uses this username.';
+            }
         }
 
         if (!$errors) {
-            $pdo->prepare('UPDATE users SET name = :name, email = :email WHERE user_id = :id')
-                ->execute(['name' => $name, 'email' => $email, 'id' => $userId]);
-            $_SESSION['name']  = $name;
-            $_SESSION['email'] = $email;
+            $pdo->prepare('UPDATE users SET name = :name, email = :email, username = :username WHERE user_id = :id')
+                ->execute(['name' => $name, 'email' => $email, 'username' => $username, 'id' => $userId]);
+            $_SESSION['name']     = $name;
+            $_SESSION['email']    = $email;
+            $_SESSION['username'] = $username;
             logActivity($pdo, $userId, 'Update Profile', 'profile', 'Updated own profile details.');
             flash('success', 'Profile updated successfully.');
             redirect(APP_URL . '/modules/profile/index.php');
@@ -84,6 +93,7 @@ include __DIR__ . '/../../includes/layout/header.php';
             <input type="hidden" name="form_type" value="profile">
             <div class="form-group"><label for="name">Full Name *</label><input type="text" id="name" name="name" required value="<?= e($user['name']) ?>"></div>
             <div class="form-group"><label for="email">Email *</label><input type="email" id="email" name="email" required value="<?= e($user['email']) ?>"></div>
+            <div class="form-group"><label for="username">Username *</label><input type="text" id="username" name="username" required minlength="3" maxlength="50" value="<?= e($user['username']) ?>"></div>
             <div class="form-group"><label>Role</label><input type="text" value="<?= e($_SESSION['role_name']) ?>" disabled></div>
             <div class="form-group"><label>Department</label><input type="text" value="<?= e($_SESSION['department_name'] ?? 'N/A') ?>" disabled></div>
             <button type="submit" class="btn btn-primary">Save Changes</button>

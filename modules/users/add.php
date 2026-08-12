@@ -3,7 +3,7 @@ require_once __DIR__ . '/../../includes/bootstrap.php';
 requireRole([ROLE_ADMIN]);
 
 $errors = [];
-$input  = ['name' => '', 'email' => '', 'role_id' => '', 'department_id' => ''];
+$input  = ['name' => '', 'email' => '', 'username' => '', 'role_id' => '', 'department_id' => ''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
@@ -11,18 +11,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = [
         'name'          => clean($_POST['name'] ?? ''),
         'email'         => clean($_POST['email'] ?? ''),
+        'username'      => clean($_POST['username'] ?? ''),
         'role_id'       => $_POST['role_id'] ?? '',
         'department_id' => $_POST['department_id'] ?? '',
     ];
     $password = (string) ($_POST['password'] ?? '');
 
     $errors = validateRequired($input, [
-        'name'    => 'Name',
-        'email'   => 'Email',
-        'role_id' => 'Role',
+        'name'     => 'Name',
+        'email'    => 'Email',
+        'username' => 'Username',
+        'role_id'  => 'Role',
     ]);
     if ($input['email'] !== '' && !filter_var($input['email'], FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Enter a valid email address.';
+    }
+    if ($input['username'] !== '' && !preg_match('/^[a-zA-Z0-9._-]{3,50}$/', $input['username'])) {
+        $errors[] = 'Username must be 3-50 characters, using letters, numbers, dots, underscores, or hyphens only.';
     }
     if (strlen($password) < 6) {
         $errors[] = 'Password must be at least 6 characters.';
@@ -35,15 +40,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'A user with this email already exists.';
         }
     }
+    if (!$errors) {
+        $check = $pdo->prepare('SELECT 1 FROM users WHERE username = :username');
+        $check->execute(['username' => $input['username']]);
+        if ($check->fetch()) {
+            $errors[] = 'A user with this username already exists.';
+        }
+    }
 
     if (!$errors) {
         $stmt = $pdo->prepare(
-            'INSERT INTO users (name, email, password, role_id, department_id, status)
-             VALUES (:name, :email, :password, :role_id, :department_id, "active")'
+            'INSERT INTO users (name, email, username, password, role_id, department_id, status)
+             VALUES (:name, :email, :username, :password, :role_id, :department_id, "active")'
         );
         $stmt->execute([
             'name'          => $input['name'],
             'email'         => $input['email'],
+            'username'      => $input['username'],
             'password'      => password_hash($password, PASSWORD_DEFAULT),
             'role_id'       => $input['role_id'],
             'department_id' => $input['department_id'] !== '' ? $input['department_id'] : null,
@@ -76,6 +89,10 @@ include __DIR__ . '/../../includes/layout/header.php';
         <div class="form-group">
             <label for="email">Email *</label>
             <input type="email" id="email" name="email" required value="<?= e($input['email']) ?>">
+        </div>
+        <div class="form-group">
+            <label for="username">Username *</label>
+            <input type="text" id="username" name="username" required minlength="3" maxlength="50" value="<?= e($input['username']) ?>">
         </div>
         <div class="form-group">
             <label for="password">Temporary Password *</label>

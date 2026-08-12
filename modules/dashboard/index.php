@@ -93,7 +93,7 @@ foreach ($stmt->fetchAll() as $row) {
 $activityChart = [];
 for ($i = 6; $i >= 0; $i--) {
     $d = date('Y-m-d', strtotime("-$i day"));
-    $activityChart[] = ['label' => date('D', strtotime($d)), 'count' => $activityByDate[$d] ?? 0];
+    $activityChart[] = ['label' => tWeekday($d), 'count' => $activityByDate[$d] ?? 0];
 }
 $maxActivity = max(1, max(array_column($activityChart, 'count')));
 
@@ -122,47 +122,47 @@ function renderDonut(array $segments, string $centerValue, string $centerLabel):
     return $html . '</div>';
 }
 
-$pageTitle  = 'Dashboard';
+$pageTitle  = t('nav.dashboard');
 $activeMenu = 'dashboard';
 include __DIR__ . '/../../includes/layout/header.php';
 ?>
 
-<p class="text-muted mt-1">Welcome back, <strong><?= e($_SESSION['name']) ?></strong> — <?= e($_SESSION['role_name']) ?><?= $_SESSION['department_name'] ? ' · ' . e($_SESSION['department_name']) : '' ?>.</p>
+<p class="text-muted mt-1"><?= e(t('dash.welcome')) ?> <strong><?= e($_SESSION['name']) ?></strong> — <?= e($_SESSION['role_name']) ?><?= $_SESSION['department_name'] ? ' · ' . e($_SESSION['department_name']) : '' ?>.</p>
 
 <div class="stat-grid mt-2">
     <div class="stat-card">
         <div class="stat-card-icon"><?= icon('assets') ?></div>
-        <div class="stat-label"><?= $isHead ? 'Department Assets' : 'Total Assets' ?></div>
+        <div class="stat-label"><?= $isHead ? e(t('dash.department_assets')) : e(t('dash.total_assets')) ?></div>
         <div class="stat-value"><?= $totalAssets ?></div>
     </div>
     <div class="stat-card accent">
         <div class="stat-card-icon"><?= icon('allocations') ?></div>
-        <div class="stat-label">Active Allocations</div>
+        <div class="stat-label"><?= e(t('dash.active_allocations')) ?></div>
         <div class="stat-value"><?= $activeAllocations ?></div>
     </div>
     <div class="stat-card warning">
         <div class="stat-card-icon"><?= icon('maintenance') ?></div>
-        <div class="stat-label">Pending Maintenance</div>
+        <div class="stat-label"><?= e(t('dash.pending_maintenance')) ?></div>
         <div class="stat-value"><?= $pendingMaintenance ?></div>
     </div>
     <?php if (hasRole([ROLE_ADMIN, ROLE_OFFICER, ROLE_TOPMGMT])): ?>
     <div class="stat-card danger">
         <div class="stat-card-icon"><?= icon('disposals') ?></div>
-        <div class="stat-label">Pending Disposals</div>
+        <div class="stat-label"><?= e(t('dash.pending_disposals')) ?></div>
         <div class="stat-value"><?= $pendingDisposals ?></div>
     </div>
     <?php endif; ?>
     <?php if (hasRole([ROLE_ADMIN, ROLE_OFFICER, ROLE_HEAD])): ?>
     <div class="stat-card">
         <div class="stat-card-icon"><?= icon('requisitions') ?></div>
-        <div class="stat-label">Pending Requisitions</div>
+        <div class="stat-label"><?= e(t('dash.pending_requisitions')) ?></div>
         <div class="stat-value"><?= $pendingRequisitions ?></div>
     </div>
     <?php endif; ?>
     <?php if ($totalUsers !== null): ?>
     <div class="stat-card">
         <div class="stat-card-icon"><?= icon('users') ?></div>
-        <div class="stat-label">Total Users</div>
+        <div class="stat-label"><?= e(t('dash.total_users')) ?></div>
         <div class="stat-value"><?= $totalUsers ?></div>
     </div>
     <?php endif; ?>
@@ -170,49 +170,49 @@ include __DIR__ . '/../../includes/layout/header.php';
 
 <div class="insight-grid">
     <div class="donut-card">
-        <h4>Assets by Status</h4>
+        <h4><?= e(t('dash.assets_by_status')) ?></h4>
         <?= renderDonut([
-            ['label' => 'Active', 'value' => $assetStatusCounts['active'], 'color' => 'var(--color-accent)'],
-            ['label' => 'Under Repair', 'value' => $assetStatusCounts['under_repair'], 'color' => 'var(--color-warning)'],
-            ['label' => 'Disposed', 'value' => $assetStatusCounts['disposed'], 'color' => 'var(--color-danger)'],
-        ], (string) $totalAssets, 'Assets') ?>
+            ['label' => t('dash.status.active'), 'value' => $assetStatusCounts['active'], 'color' => 'var(--color-accent)'],
+            ['label' => t('dash.status.under_repair'), 'value' => $assetStatusCounts['under_repair'], 'color' => 'var(--color-warning)'],
+            ['label' => t('dash.status.disposed'), 'value' => $assetStatusCounts['disposed'], 'color' => 'var(--color-danger)'],
+        ], (string) $totalAssets, t('assets')) ?>
     </div>
 
     <div class="tile-grid-2x2">
         <div class="tile-block tile-navy">
             <span class="tile-icon"><?= icon('assets') ?></span>
-            <span class="tile-label">Active Assets</span>
+            <span class="tile-label"><?= e(t('dash.tile.active_assets')) ?></span>
             <span class="tile-value"><?= $assetStatusCounts['active'] ?></span>
         </div>
         <div class="tile-block tile-green">
             <span class="tile-icon"><?= icon('maintenance') ?></span>
-            <span class="tile-label">Under Repair</span>
+            <span class="tile-label"><?= e(t('dash.status.under_repair')) ?></span>
             <span class="tile-value"><?= $assetStatusCounts['under_repair'] ?></span>
         </div>
         <div class="tile-block tile-green">
             <span class="tile-icon"><?= icon('disposals') ?></span>
-            <span class="tile-label">Disposed</span>
+            <span class="tile-label"><?= e(t('dash.status.disposed')) ?></span>
             <span class="tile-value"><?= $assetStatusCounts['disposed'] ?></span>
         </div>
         <div class="tile-block tile-navy">
             <span class="tile-icon"><?= icon('categories') ?></span>
-            <span class="tile-label"><?= $isHead ? 'Department Total' : 'Total Assets' ?></span>
+            <span class="tile-label"><?= $isHead ? e(t('dash.tile.department_total')) : e(t('dash.total_assets')) ?></span>
             <span class="tile-value"><?= $totalAssets ?></span>
         </div>
     </div>
 
     <div class="donut-card">
-        <h4>Allocations by Status</h4>
+        <h4><?= e(t('dash.allocations_by_status')) ?></h4>
         <?= renderDonut([
-            ['label' => 'Active', 'value' => $allocStatusCounts['active'], 'color' => 'var(--color-primary)'],
-            ['label' => 'Returned', 'value' => $allocStatusCounts['returned'], 'color' => 'var(--color-accent)'],
-            ['label' => 'In Repair', 'value' => $allocStatusCounts['repair'], 'color' => 'var(--color-warning)'],
-        ], (string) $allocTotal, 'Allocations') ?>
+            ['label' => t('dash.status.active'), 'value' => $allocStatusCounts['active'], 'color' => 'var(--color-primary)'],
+            ['label' => t('dash.status.returned'), 'value' => $allocStatusCounts['returned'], 'color' => 'var(--color-accent)'],
+            ['label' => t('dash.status.under_repair'), 'value' => $allocStatusCounts['repair'], 'color' => 'var(--color-warning)'],
+        ], (string) $allocTotal, t('allocations')) ?>
     </div>
 </div>
 
 <div class="bar-chart-card">
-    <h3>Activity — Last 7 Days</h3>
+    <h3><?= e(t('dash.activity_7_days')) ?></h3>
     <div class="bar-chart-mini">
         <?php foreach ($activityChart as $day): ?>
             <div class="bar-chart-col">
@@ -223,12 +223,12 @@ include __DIR__ . '/../../includes/layout/header.php';
     </div>
 </div>
 
-<div class="section-heading"><h2>Recent Activity</h2></div>
+<div class="section-heading"><h2><?= e(t('dash.recent_activity')) ?></h2></div>
 <div class="table-wrap">
 <table>
-    <thead><tr><th>Action</th><th>Module</th><th>Description</th><th>By</th><th>When</th></tr></thead>
+    <thead><tr><th><?= e(t('dash.table.action')) ?></th><th><?= e(t('dash.table.module')) ?></th><th><?= e(t('dash.table.description')) ?></th><th><?= e(t('dash.table.by')) ?></th><th><?= e(t('dash.table.when')) ?></th></tr></thead>
     <tbody>
-    <?php if (!$recentActivity): ?><tr class="empty-row"><td colspan="5">No recent activity recorded yet.</td></tr><?php endif; ?>
+    <?php if (!$recentActivity): ?><tr class="empty-row"><td colspan="5"><?= e(t('dash.no_activity')) ?></td></tr><?php endif; ?>
     <?php foreach ($recentActivity as $act): ?>
         <tr>
             <td><?= e($act['action']) ?></td>

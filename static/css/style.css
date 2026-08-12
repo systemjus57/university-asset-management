@@ -163,6 +163,7 @@ h1, h2, h3, h4 { color: var(--color-primary-dark); margin: 0 0 0.6rem; font-weig
 .topbar-user { display: flex; align-items: center; gap: 0.9rem; }
 
 .topbar-bell {
+    position: relative;
     background: var(--color-gray-100);
     border: none;
     width: 38px;
@@ -175,6 +176,34 @@ h1, h2, h3, h4 { color: var(--color-primary-dark); margin: 0 0 0.6rem; font-weig
     cursor: pointer;
 }
 .topbar-bell:hover { background: var(--color-gray-200); }
+
+.topbar-bell-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 3px;
+    border-radius: 999px;
+    background: var(--color-danger);
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 17px;
+    text-align: center;
+    border: 2px solid var(--color-white);
+}
+
+.topbar-alerts-menu { min-width: 280px; }
+.topbar-alerts-header {
+    padding: 0.7rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--color-primary-dark);
+    border-bottom: 1px solid var(--color-gray-200);
+}
+.topbar-alerts-empty { padding: 1.25rem 1rem; font-size: 0.82rem; color: var(--color-text-muted); text-align: center; }
+.topbar-alerts-menu a .icon { color: var(--color-accent-dark); }
 
 .topbar-role {
     background: var(--color-accent-light);
@@ -642,6 +671,8 @@ body.theme-dark input, body.theme-dark select, body.theme-dark textarea {
 }
 body.theme-dark .topbar-user-btn:hover, body.theme-dark .topbar-bell, body.theme-dark .topbar-dropdown-menu { background: #16301f; border-color: #204030; color: #e6ede8; }
 body.theme-dark .topbar-bell:hover { background: #1c3a27; }
+body.theme-dark .topbar-bell-badge { border-color: #16301f; }
+body.theme-dark .topbar-alerts-header { color: #cfe3d6; border-color: #204030; }
 body.theme-dark .nav-section-label { color: rgba(255,255,255,0.35); }
 body.theme-dark h1, body.theme-dark h2, body.theme-dark h3, body.theme-dark h4 { color: #cfe3d6; }
 body.theme-dark .stat-value, body.theme-dark .donut-center-value { color: #cfe3d6; }

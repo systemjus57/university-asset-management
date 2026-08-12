@@ -100,7 +100,10 @@ include __DIR__ . '/../../includes/layout/header.php';
 
 <div class="card-header">
     <h2 style="margin:0;"><?= e($reportLabels[$report]) ?></h2>
-    <a class="btn btn-accent btn-sm" href="<?= APP_URL ?>/modules/reports/export_csv.php?<?= http_build_query($_GET) ?>">Export CSV</a>
+    <div class="d-flex gap-1">
+        <a class="btn btn-outline btn-sm" href="<?= APP_URL ?>/modules/reports/export_pdf.php?<?= http_build_query($_GET) ?>">Export PDF</a>
+        <a class="btn btn-accent btn-sm" href="<?= APP_URL ?>/modules/reports/export_csv.php?<?= http_build_query($_GET) ?>">Export CSV</a>
+    </div>
 </div>
 
 <div class="table-wrap">

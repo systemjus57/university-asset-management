@@ -14,18 +14,20 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ---- User dropdown ----
-    var userMenuBtn = document.getElementById('userMenuBtn');
-    var userMenu = document.getElementById('userMenu');
-    if (userMenuBtn && userMenu) {
-        userMenuBtn.addEventListener('click', function (e) {
+    // ---- Dropdown menus (user account, notifications) ----
+    document.querySelectorAll('[data-dropdown-toggle]').forEach(function (btn) {
+        var menu = document.getElementById(btn.getAttribute('data-dropdown-toggle'));
+        if (!menu) return;
+        btn.addEventListener('click', function (e) {
             e.stopPropagation();
-            userMenu.classList.toggle('open');
+            var wasOpen = menu.classList.contains('open');
+            document.querySelectorAll('.topbar-dropdown-menu.open').forEach(function (m) { m.classList.remove('open'); });
+            if (!wasOpen) menu.classList.add('open');
         });
-        document.addEventListener('click', function () {
-            userMenu.classList.remove('open');
-        });
-    }
+    });
+    document.addEventListener('click', function () {
+        document.querySelectorAll('.topbar-dropdown-menu.open').forEach(function (m) { m.classList.remove('open'); });
+    });
 
     // ---- Generic modal open/close ----
     document.querySelectorAll('[data-modal-target]').forEach(function (trigger) {

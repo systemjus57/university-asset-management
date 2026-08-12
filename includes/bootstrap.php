@@ -8,6 +8,9 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/i18n.php';
+
+setActiveLanguage(getSetting($pdo, 'language', 'en'));
 
 // Maintenance mode gate — everyone except Admin is blocked while it's on.
 if (isLoggedIn() && ($_SESSION['role_name'] ?? '') !== ROLE_ADMIN) {

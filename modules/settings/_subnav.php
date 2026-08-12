@@ -1,12 +1,12 @@
 <?php
 /** Shared sub-navigation for the Settings module. $activeSettingsTab set by the including page. */
 $settingsTabs = [
-    'general'    => ['label' => 'General', 'href' => 'index.php'],
-    'smtp'       => ['label' => 'Email (SMTP)', 'href' => 'smtp.php'],
-    'backup'     => ['label' => 'Backup & Restore', 'href' => 'backup.php'],
-    'logs'       => ['label' => 'Activity Logs', 'href' => 'logs.php'],
-    'login_logs' => ['label' => 'Login Logs', 'href' => 'login_logs.php'],
-    'system'     => ['label' => 'System Info', 'href' => 'system_info.php'],
+    'general'    => ['label' => t('settings.tab.general'), 'href' => 'index.php'],
+    'smtp'       => ['label' => t('settings.tab.smtp'), 'href' => 'smtp.php'],
+    'backup'     => ['label' => t('settings.tab.backup'), 'href' => 'backup.php'],
+    'logs'       => ['label' => t('settings.tab.logs'), 'href' => 'logs.php'],
+    'login_logs' => ['label' => t('settings.tab.login_logs'), 'href' => 'login_logs.php'],
+    'system'     => ['label' => t('settings.tab.system'), 'href' => 'system_info.php'],
 ];
 ?>
 <div class="tabs">

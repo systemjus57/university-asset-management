@@ -157,6 +157,142 @@ function appLogoUrl(PDO $pdo): string
     return $logoPath !== '' ? $logoPath : APP_URL . '/static/images/logo.webp';
 }
 
+/** Role-scoped list of items awaiting the current user's attention, for the topbar notification bell. */
+function getPendingAlerts(PDO $pdo): array
+{
+    if (!isLoggedIn()) {
+        return [];
+    }
+
+    $alerts = [];
+    $isHead = hasRole([ROLE_HEAD]);
+    $deptId = $_SESSION['department_id'] ?? null;
+
+    if ($isHead) {
+        $stmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM asset_maintenance m JOIN assets a ON a.asset_id = m.asset_id
+             WHERE m.status IN ('pending','in_progress') AND a.department_id = :dept"
+        );
+        $stmt->execute(['dept' => $deptId]);
+        $maintenanceCount = (int) $stmt->fetchColumn();
+    } else {
+        $maintenanceCount = (int) $pdo->query("SELECT COUNT(*) FROM asset_maintenance WHERE status IN ('pending','in_progress')")->fetchColumn();
+    }
+    // English pluralizes with a trailing 's'; Somali nouns don't inflect for count here, so the suffix is skipped.
+    $plural = fn (int $count) => (activeLanguage() === 'en' && $count !== 1) ? 's' : '';
+
+    if ($maintenanceCount > 0) {
+        $alerts[] = ['count' => $maintenanceCount, 'label' => t('alert.maintenance') . $plural($maintenanceCount), 'url' => APP_URL . '/modules/maintenance/list.php'];
+    }
+
+    if (hasRole([ROLE_ADMIN, ROLE_OFFICER, ROLE_TOPMGMT])) {
+        $disposalCount = (int) $pdo->query("SELECT COUNT(*) FROM asset_disposals WHERE status = 'pending'")->fetchColumn();
+        if ($disposalCount > 0) {
+            $alerts[] = ['count' => $disposalCount, 'label' => t('alert.disposal') . $plural($disposalCount), 'url' => APP_URL . '/modules/disposals/list.php'];
+        }
+    }
+
+    if (hasRole([ROLE_ADMIN, ROLE_OFFICER])) {
+        $requisitionCount = (int) $pdo->query("SELECT COUNT(*) FROM requisitions WHERE status = 'pending'")->fetchColumn();
+    } elseif ($isHead) {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM requisitions WHERE status = 'pending' AND department_id = :dept");
+        $stmt->execute(['dept' => $deptId]);
+        $requisitionCount = (int) $stmt->fetchColumn();
+    } else {
+        $requisitionCount = 0;
+    }
+    if ($requisitionCount > 0) {
+        $alerts[] = ['count' => $requisitionCount, 'label' => t('alert.requisition') . $plural($requisitionCount), 'url' => APP_URL . '/modules/requisitions/list.php'];
+    }
+
+    return $alerts;
+}
+
+/**
+ * Runs one of the Reports module's five report queries and returns flat,
+ * display-ready rows. Shared by the CSV and PDF exporters so the query
+ * logic (and its department scoping) lives in exactly one place.
+ */
+function getReportRows(PDO $pdo, string $report, bool $isHead, ?int $deptId, string $dateFrom, string $dateTo): array
+{
+    $labels = [
+        'by_department'    => 'Assets by Department',
+        'by_category'      => 'Assets by Category',
+        'by_status'        => 'Assets by Status',
+        'maintenance_cost' => 'Maintenance Cost Report',
+        'disposals'        => 'Disposal Report',
+    ];
+    $label = $labels[$report] ?? $labels['by_department'];
+
+    $header = [];
+    $rows   = [];
+
+    if ($report === 'by_department') {
+        $header = ['Department', 'Asset Count', 'Total Value'];
+        $sql = "SELECT d.department_name, COUNT(a.asset_id) AS asset_count, COALESCE(SUM(a.purchase_cost),0) AS total_value
+                FROM departments d LEFT JOIN assets a ON a.department_id = d.department_id
+                " . ($isHead ? 'WHERE d.department_id = :dept' : '') . "
+                GROUP BY d.department_id, d.department_name ORDER BY d.department_name";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($isHead ? ['dept' => $deptId] : []);
+        foreach ($stmt->fetchAll() as $r) {
+            $rows[] = [$r['department_name'], (string) $r['asset_count'], number_format((float) $r['total_value'], 2)];
+        }
+    } elseif ($report === 'by_category') {
+        $header = ['Category', 'Asset Count', 'Total Value'];
+        $where = $isHead ? 'WHERE a.department_id = :dept' : '';
+        $sql = "SELECT c.category_name, COUNT(a.asset_id) AS asset_count, COALESCE(SUM(a.purchase_cost),0) AS total_value
+                FROM categories c LEFT JOIN assets a ON a.category_id = c.category_id $where
+                GROUP BY c.category_id, c.category_name ORDER BY c.category_name";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($isHead ? ['dept' => $deptId] : []);
+        foreach ($stmt->fetchAll() as $r) {
+            $rows[] = [$r['category_name'], (string) $r['asset_count'], number_format((float) $r['total_value'], 2)];
+        }
+    } elseif ($report === 'by_status') {
+        $header = ['Status', 'Asset Count', 'Total Value'];
+        $where = $isHead ? 'WHERE department_id = :dept' : '';
+        $sql = "SELECT status, COUNT(*) AS asset_count, COALESCE(SUM(purchase_cost),0) AS total_value FROM assets $where GROUP BY status";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($isHead ? ['dept' => $deptId] : []);
+        foreach ($stmt->fetchAll() as $r) {
+            $rows[] = [ucwords(str_replace('_', ' ', $r['status'])), (string) $r['asset_count'], number_format((float) $r['total_value'], 2)];
+        }
+    } elseif ($report === 'maintenance_cost') {
+        $header = ['Asset', 'Completed Date', 'Cost', 'Technician/Vendor'];
+        $where = ["m.status = 'completed'"];
+        $params = [];
+        if ($isHead) { $where[] = 'a.department_id = :dept'; $params['dept'] = $deptId; }
+        if ($dateFrom !== '') { $where[] = 'm.completed_date >= :from'; $params['from'] = $dateFrom; }
+        if ($dateTo !== '')   { $where[] = 'm.completed_date <= :to';   $params['to'] = $dateTo; }
+        $whereSql = 'WHERE ' . implode(' AND ', $where);
+        $sql = "SELECT a.name AS asset_name, m.completed_date, m.cost, m.technician_vendor
+                FROM asset_maintenance m JOIN assets a ON a.asset_id = m.asset_id $whereSql ORDER BY m.completed_date DESC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll() as $r) {
+            $rows[] = [$r['asset_name'], formatDate($r['completed_date']), number_format((float) $r['cost'], 2), $r['technician_vendor'] ?? '—'];
+        }
+    } elseif ($report === 'disposals') {
+        $header = ['Asset', 'Method', 'Status', 'Requested Date', 'Disposal Date', 'Reason'];
+        $where = [];
+        $params = [];
+        if ($isHead) { $where[] = 'a.department_id = :dept'; $params['dept'] = $deptId; }
+        if ($dateFrom !== '') { $where[] = 'ds.request_date >= :from'; $params['from'] = $dateFrom; }
+        if ($dateTo !== '')   { $where[] = 'ds.request_date <= :to';   $params['to'] = $dateTo; }
+        $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+        $sql = "SELECT a.name AS asset_name, ds.method, ds.status, ds.request_date, ds.disposal_date, ds.reason
+                FROM asset_disposals ds JOIN assets a ON a.asset_id = ds.asset_id $whereSql ORDER BY ds.request_date DESC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll() as $r) {
+            $rows[] = [$r['asset_name'], ucfirst($r['method']), ucfirst($r['status']), formatDate($r['request_date']), formatDate($r['disposal_date']), $r['reason'] ?? '—'];
+        }
+    }
+
+    return ['label' => $label, 'header' => $header, 'rows' => $rows];
+}
+
 /** Records an entry in activity_logs for the audit trail / dashboard feed. */
 function logActivity(PDO $pdo, ?int $userId, string $action, string $module, string $description = ''): void
 {

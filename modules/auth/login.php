@@ -6,45 +6,46 @@ if (isLoggedIn()) {
 }
 
 $errors = [];
-$emailValue = '';
+$loginValue = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verifyCsrf()) {
-        $errors[] = 'Your session expired. Please try again.';
+        $errors[] = t('login.err.session_expired');
     } else {
-        $emailValue = clean($_POST['email'] ?? '');
+        $loginValue = clean($_POST['login'] ?? '');
         $password   = (string) ($_POST['password'] ?? '');
 
-        if ($emailValue === '' || $password === '') {
-            $errors[] = 'Email and password are both required.';
+        if ($loginValue === '' || $password === '') {
+            $errors[] = t('login.err.required');
         } else {
             $stmt = $pdo->prepare(
                 'SELECT u.*, r.role_name, d.department_name
                  FROM users u
                  JOIN roles r ON r.role_id = u.role_id
                  LEFT JOIN departments d ON d.department_id = u.department_id
-                 WHERE u.email = :email LIMIT 1'
+                 WHERE u.email = :login1 OR u.username = :login2 LIMIT 1'
             );
-            $stmt->execute(['email' => $emailValue]);
+            $stmt->execute(['login1' => $loginValue, 'login2' => $loginValue]);
             $user = $stmt->fetch();
 
             if (!$user || !password_verify($password, $user['password'])) {
-                $errors[] = 'Invalid email or password.';
-                logLogin($pdo, $user ? $user['user_id'] : null, $emailValue, 'failed');
+                $errors[] = t('login.err.invalid');
+                logLogin($pdo, $user ? $user['user_id'] : null, $loginValue, 'failed');
             } elseif ($user['status'] !== 'active') {
-                $errors[] = 'Your account has been deactivated. Contact the system administrator.';
-                logLogin($pdo, $user['user_id'], $emailValue, 'failed');
+                $errors[] = t('login.err.deactivated');
+                logLogin($pdo, $user['user_id'], $loginValue, 'failed');
             } else {
                 session_regenerate_id(true);
                 $_SESSION['user_id']         = (int) $user['user_id'];
                 $_SESSION['name']             = $user['name'];
                 $_SESSION['email']             = $user['email'];
+                $_SESSION['username']          = $user['username'];
                 $_SESSION['role_id']            = (int) $user['role_id'];
                 $_SESSION['role_name']           = $user['role_name'];
                 $_SESSION['department_id']        = $user['department_id'] !== null ? (int) $user['department_id'] : null;
                 $_SESSION['department_name']       = $user['department_name'];
 
-                logLogin($pdo, $user['user_id'], $emailValue, 'success');
+                logLogin($pdo, $user['user_id'], $loginValue, 'success');
                 logActivity($pdo, $user['user_id'], 'Login', 'auth', $user['name'] . ' logged in.');
 
                 $redirectTo = $_SESSION['redirect_after_login'] ?? (APP_URL . '/modules/dashboard/index.php');
@@ -58,16 +59,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $uniName = getSetting($pdo, 'university_name', 'Somali National University');
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<?= e(activeLanguage()) ?>">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Login · <?= e($uniName) ?></title>
+<title><?= e(t('login.button')) ?> · <?= e($uniName) ?></title>
 <link rel="icon" type="image/webp" href="<?= e(appLogoUrl($pdo)) ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="<?= APP_URL ?>/static/css/style.css">
+<link rel="stylesheet" href="<?= APP_URL ?>/static/css/style.css?v=<?= filemtime(APP_ROOT . '/static/css/style.css') ?>">
 </head>
 <body>
 <div class="auth-shell">
@@ -75,7 +76,7 @@ $uniName = getSetting($pdo, 'university_name', 'Somali National University');
         <div class="auth-brand">
             <img class="auth-logo" src="<?= e(appLogoUrl($pdo)) ?>" alt="<?= e($uniName) ?> logo">
             <h1><?= e($uniName) ?></h1>
-            <p>University Asset Management System</p>
+            <p><?= e(t('login.subtitle')) ?></p>
         </div>
 
         <?php if ($errors): ?>
@@ -89,18 +90,18 @@ $uniName = getSetting($pdo, 'university_name', 'Somali National University');
         <form method="post" action="" novalidate id="loginForm">
             <?= csrfField() ?>
             <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" value="<?= e($emailValue) ?>" required autofocus>
+                <label for="login"><?= e(t('login.field')) ?></label>
+                <input type="text" id="login" name="login" value="<?= e($loginValue) ?>" required autofocus autocomplete="username">
             </div>
             <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required minlength="4">
+                <label for="password"><?= e(t('login.password')) ?></label>
+                <input type="password" id="password" name="password" required minlength="4" autocomplete="current-password">
             </div>
-            <button type="submit" class="btn btn-primary btn-block">Login</button>
+            <button type="submit" class="btn btn-primary btn-block"><?= e(t('login.button')) ?></button>
         </form>
-        <p class="auth-hint">Use your university-issued email and password. Contact the Admin if you cannot access your account.</p>
+        <p class="auth-hint"><?= e(t('login.hint')) ?></p>
     </div>
 </div>
-<script src="<?= APP_URL ?>/static/js/validation.js"></script>
+<script src="<?= APP_URL ?>/static/js/validation.js?v=<?= filemtime(APP_ROOT . '/static/js/validation.js') ?>"></script>
 </body>
 </html>

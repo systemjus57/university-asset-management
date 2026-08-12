@@ -46,6 +46,7 @@ CREATE TABLE users (
     user_id        INT AUTO_INCREMENT PRIMARY KEY,
     name           VARCHAR(100) NOT NULL,
     email          VARCHAR(150) NOT NULL UNIQUE,
+    username       VARCHAR(50) NOT NULL UNIQUE,
     password       VARCHAR(255) NOT NULL,
     role_id        INT NOT NULL,
     department_id  INT NULL,
@@ -308,14 +309,14 @@ INSERT INTO departments (department_name, location) VALUES
 ('Faculty of Engineering', 'Engineering Block');
 
 -- Demo password for every seeded user: Password123!
-INSERT INTO users (name, email, password, role_id, department_id, status) VALUES
-('System Admin',      'admin@sun.edu.so',      '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 1, 1, 'active'),
-('Asad Hassan',        'asset.officer1@sun.edu.so', '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 2, 1, 'active'),
-('Faadumo Nuur',        'asset.officer2@sun.edu.so', '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 2, 1, 'active'),
-('Cabdi Warsame',       'head.ict@sun.edu.so',       '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 3, 1, 'active'),
-('Hodan Ali',            'head.library@sun.edu.so',   '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 3, 3, 'active'),
-('Mohamed Yusuf',         'head.finance@sun.edu.so',   '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 3, 2, 'active'),
-('Amina Sheikh',           'topmanagement@sun.edu.so',  '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 4, NULL, 'active');
+INSERT INTO users (name, email, username, password, role_id, department_id, status) VALUES
+('System Admin',      'admin@sun.edu.so',      'admin',           '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 1, 1, 'active'),
+('Asad Hassan',        'asset.officer1@sun.edu.so', 'asset.officer1', '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 2, 1, 'active'),
+('Faadumo Nuur',        'asset.officer2@sun.edu.so', 'asset.officer2', '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 2, 1, 'active'),
+('Cabdi Warsame',       'head.ict@sun.edu.so',       'head.ict',       '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 3, 1, 'active'),
+('Hodan Ali',            'head.library@sun.edu.so',   'head.library',   '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 3, 3, 'active'),
+('Mohamed Yusuf',         'head.finance@sun.edu.so',   'head.finance',   '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 3, 2, 'active'),
+('Amina Sheikh',           'topmanagement@sun.edu.so',  'topmanagement',  '$2b$10$OKVDvK0w4e3PeOCsrmx74uy4Re8t20qwfXX6yVLNWNwhCL3NeFyYO', 4, NULL, 'active');
 
 UPDATE departments SET head_id = 4 WHERE department_id = 1; -- ICT -> Cabdi Warsame
 UPDATE departments SET head_id = 5 WHERE department_id = 3; -- Library -> Hodan Ali

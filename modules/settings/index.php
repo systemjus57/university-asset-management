@@ -21,13 +21,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ];
 
     if ($fields['university_name'] === '') {
-        $errors[] = 'University name is required.';
+        $errors[] = t('settings.err.university_name');
     }
     if (!is_numeric($fields['session_timeout_minutes']) || (int) $fields['session_timeout_minutes'] < 5) {
-        $errors[] = 'Session timeout must be at least 5 minutes.';
+        $errors[] = t('settings.err.session_timeout');
     }
     if (!is_numeric($fields['records_per_page']) || (int) $fields['records_per_page'] < 5) {
-        $errors[] = 'Records per page must be at least 5.';
+        $errors[] = t('settings.err.records_per_page');
     }
 
     // Logo upload (optional)
@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setSetting($pdo, 'logo_path', $logoPath);
         }
         logActivity($pdo, $_SESSION['user_id'], 'Update Settings', 'settings', 'Updated general system settings.');
-        flash('success', 'Settings saved successfully.');
+        flash('success', t('settings.saved'));
         redirect(APP_URL . '/modules/settings/index.php');
     }
 }
@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $settings = getAllSettings($pdo);
 
 $activeSettingsTab = 'general';
-$pageTitle  = 'Settings — General';
+$pageTitle  = t('settings.title_prefix') . ' ' . t('settings.tab.general');
 $activeMenu = 'settings';
 include __DIR__ . '/../../includes/layout/header.php';
 include __DIR__ . '/_subnav.php';
@@ -82,22 +82,22 @@ include __DIR__ . '/_subnav.php';
     <form method="post" action="" enctype="multipart/form-data" novalidate>
         <?= csrfField() ?>
         <div class="form-row">
-            <div class="form-group"><label for="university_name">University Name *</label><input type="text" id="university_name" name="university_name" required value="<?= e($settings['university_name'] ?? '') ?>"></div>
-            <div class="form-group"><label for="system_name">System Name</label><input type="text" id="system_name" name="system_name" value="<?= e($settings['system_name'] ?? '') ?>"></div>
+            <div class="form-group"><label for="university_name"><?= e(t('settings.university_name')) ?> *</label><input type="text" id="university_name" name="university_name" required value="<?= e($settings['university_name'] ?? '') ?>"></div>
+            <div class="form-group"><label for="system_name"><?= e(t('settings.system_name')) ?></label><input type="text" id="system_name" name="system_name" value="<?= e($settings['system_name'] ?? '') ?>"></div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label for="academic_year">Academic Year</label><input type="text" id="academic_year" name="academic_year" placeholder="2025/2026" value="<?= e($settings['academic_year'] ?? '') ?>"></div>
+            <div class="form-group"><label for="academic_year"><?= e(t('settings.academic_year')) ?></label><input type="text" id="academic_year" name="academic_year" placeholder="2025/2026" value="<?= e($settings['academic_year'] ?? '') ?>"></div>
             <div class="form-group">
-                <label for="language">Language</label>
+                <label for="language"><?= e(t('settings.language')) ?></label>
                 <select id="language" name="language">
                     <option value="en" <?= ($settings['language'] ?? 'en') === 'en' ? 'selected' : '' ?>>English</option>
-                    <option value="so" <?= ($settings['language'] ?? '') === 'so' ? 'selected' : '' ?>>Somali</option>
+                    <option value="so" <?= ($settings['language'] ?? '') === 'so' ? 'selected' : '' ?>>Soomaali</option>
                 </select>
             </div>
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label for="timezone">Time Zone</label>
+                <label for="timezone"><?= e(t('settings.timezone')) ?></label>
                 <select id="timezone" name="timezone">
                     <?php foreach (['Africa/Mogadishu', 'Africa/Nairobi', 'UTC'] as $tz): ?>
                         <option value="<?= $tz ?>" <?= ($settings['timezone'] ?? '') === $tz ? 'selected' : '' ?>><?= $tz ?></option>
@@ -105,7 +105,7 @@ include __DIR__ . '/_subnav.php';
                 </select>
             </div>
             <div class="form-group">
-                <label for="date_format">Date Format</label>
+                <label for="date_format"><?= e(t('settings.date_format')) ?></label>
                 <select id="date_format" name="date_format">
                     <?php foreach (['d-m-Y', 'm-d-Y', 'Y-m-d'] as $df): ?>
                         <option value="<?= $df ?>" <?= ($settings['date_format'] ?? '') === $df ? 'selected' : '' ?>><?= $df ?></option>
@@ -114,19 +114,19 @@ include __DIR__ . '/_subnav.php';
             </div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label for="session_timeout_minutes">Session Timeout (minutes)</label><input type="number" id="session_timeout_minutes" name="session_timeout_minutes" min="5" value="<?= e($settings['session_timeout_minutes'] ?? '60') ?>"></div>
-            <div class="form-group"><label for="records_per_page">Records Per Page</label><input type="number" id="records_per_page" name="records_per_page" min="5" value="<?= e($settings['records_per_page'] ?? '15') ?>"></div>
+            <div class="form-group"><label for="session_timeout_minutes"><?= e(t('settings.session_timeout')) ?></label><input type="number" id="session_timeout_minutes" name="session_timeout_minutes" min="5" value="<?= e($settings['session_timeout_minutes'] ?? '60') ?>"></div>
+            <div class="form-group"><label for="records_per_page"><?= e(t('settings.records_per_page')) ?></label><input type="number" id="records_per_page" name="records_per_page" min="5" value="<?= e($settings['records_per_page'] ?? '15') ?>"></div>
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label for="theme">Theme</label>
+                <label for="theme"><?= e(t('settings.theme')) ?></label>
                 <select id="theme" name="theme">
-                    <option value="light" <?= ($settings['theme'] ?? 'light') === 'light' ? 'selected' : '' ?>>Light</option>
-                    <option value="dark" <?= ($settings['theme'] ?? '') === 'dark' ? 'selected' : '' ?>>Dark</option>
+                    <option value="light" <?= ($settings['theme'] ?? 'light') === 'light' ? 'selected' : '' ?>><?= e(t('settings.theme.light')) ?></option>
+                    <option value="dark" <?= ($settings['theme'] ?? '') === 'dark' ? 'selected' : '' ?>><?= e(t('settings.theme.dark')) ?></option>
                 </select>
             </div>
             <div class="form-group">
-                <label for="logo">University Logo</label>
+                <label for="logo"><?= e(t('settings.logo')) ?></label>
                 <input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/gif">
                 <?php if (!empty($settings['logo_path'])): ?>
                     <img src="<?= e($settings['logo_path']) ?>" alt="Current logo" style="height:40px; margin-top:0.5rem;">
@@ -137,11 +137,11 @@ include __DIR__ . '/_subnav.php';
         <div class="form-group" style="background:var(--color-danger-bg); padding:0.9rem; border-radius:8px;">
             <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0;">
                 <input type="checkbox" name="maintenance_mode" value="1" style="width:auto;" <?= ($settings['maintenance_mode'] ?? '0') === '1' ? 'checked' : '' ?>>
-                Enable Maintenance Mode (blocks access for everyone except Admin)
+                <?= e(t('settings.maintenance_mode')) ?>
             </label>
         </div>
 
-        <button type="submit" class="btn btn-primary mt-1">Save Settings</button>
+        <button type="submit" class="btn btn-primary mt-1"><?= e(t('settings.save')) ?></button>
     </form>
 </div>
 

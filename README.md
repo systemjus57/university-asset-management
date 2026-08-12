@@ -101,17 +101,18 @@ Notable design choices:
 
 ## Default login credentials (demo/testing)
 
-Every seeded account uses the same password: **`Password123!`**
+Every seeded account uses the same password: **`Password123!`**. Log in
+with either the email or the username shown below.
 
-| Role            | Email                          |
-|-----------------|---------------------------------|
-| Admin           | admin@sun.edu.so                |
-| Asset Officer   | asset.officer1@sun.edu.so        |
-| Asset Officer   | asset.officer2@sun.edu.so         |
-| Department Head | head.ict@sun.edu.so (ICT)          |
-| Department Head | head.library@sun.edu.so (Library)   |
-| Department Head | head.finance@sun.edu.so (Finance)    |
-| Top Management  | topmanagement@sun.edu.so              |
+| Role            | Email                          | Username          |
+|-----------------|---------------------------------|-------------------|
+| Admin           | admin@sun.edu.so                | admin             |
+| Asset Officer   | asset.officer1@sun.edu.so        | asset.officer1    |
+| Asset Officer   | asset.officer2@sun.edu.so         | asset.officer2    |
+| Department Head | head.ict@sun.edu.so (ICT)          | head.ict          |
+| Department Head | head.library@sun.edu.so (Library)   | head.library      |
+| Department Head | head.finance@sun.edu.so (Finance)    | head.finance      |
+| Top Management  | topmanagement@sun.edu.so              | topmanagement     |
 
 Change these before any real deployment — this password is for demo
 purposes only.

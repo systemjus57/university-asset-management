@@ -20,14 +20,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = [
         'name'          => clean($_POST['name'] ?? ''),
         'email'         => clean($_POST['email'] ?? ''),
+        'username'      => clean($_POST['username'] ?? ''),
         'role_id'       => $_POST['role_id'] ?? '',
         'department_id' => $_POST['department_id'] ?? '',
     ];
     $newPassword = (string) ($_POST['password'] ?? '');
 
-    $errors = validateRequired($input, ['name' => 'Name', 'email' => 'Email', 'role_id' => 'Role']);
+    $errors = validateRequired($input, ['name' => 'Name', 'email' => 'Email', 'username' => 'Username', 'role_id' => 'Role']);
     if ($input['email'] !== '' && !filter_var($input['email'], FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Enter a valid email address.';
+    }
+    if ($input['username'] !== '' && !preg_match('/^[a-zA-Z0-9._-]{3,50}$/', $input['username'])) {
+        $errors[] = 'Username must be 3-50 characters, using letters, numbers, dots, underscores, or hyphens only.';
     }
     if ($newPassword !== '' && strlen($newPassword) < 6) {
         $errors[] = 'New password must be at least 6 characters.';
@@ -40,23 +44,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Another user already uses this email.';
         }
     }
+    if (!$errors) {
+        $check = $pdo->prepare('SELECT 1 FROM users WHERE username = :username AND user_id != :id');
+        $check->execute(['username' => $input['username'], 'id' => $userId]);
+        if ($check->fetch()) {
+            $errors[] = 'Another user already uses this username.';
+        }
+    }
 
     if (!$errors) {
         if ($newPassword !== '') {
             $stmt = $pdo->prepare(
-                'UPDATE users SET name = :name, email = :email, role_id = :role_id, department_id = :department_id, password = :password WHERE user_id = :id'
+                'UPDATE users SET name = :name, email = :email, username = :username, role_id = :role_id, department_id = :department_id, password = :password WHERE user_id = :id'
             );
             $stmt->execute([
-                'name' => $input['name'], 'email' => $input['email'], 'role_id' => $input['role_id'],
+                'name' => $input['name'], 'email' => $input['email'], 'username' => $input['username'], 'role_id' => $input['role_id'],
                 'department_id' => $input['department_id'] !== '' ? $input['department_id'] : null,
                 'password' => password_hash($newPassword, PASSWORD_DEFAULT), 'id' => $userId,
             ]);
         } else {
             $stmt = $pdo->prepare(
-                'UPDATE users SET name = :name, email = :email, role_id = :role_id, department_id = :department_id WHERE user_id = :id'
+                'UPDATE users SET name = :name, email = :email, username = :username, role_id = :role_id, department_id = :department_id WHERE user_id = :id'
             );
             $stmt->execute([
-                'name' => $input['name'], 'email' => $input['email'], 'role_id' => $input['role_id'],
+                'name' => $input['name'], 'email' => $input['email'], 'username' => $input['username'], 'role_id' => $input['role_id'],
                 'department_id' => $input['department_id'] !== '' ? $input['department_id'] : null, 'id' => $userId,
             ]);
         }
@@ -89,6 +100,10 @@ include __DIR__ . '/../../includes/layout/header.php';
         <div class="form-group">
             <label for="email">Email *</label>
             <input type="email" id="email" name="email" required value="<?= e($user['email']) ?>">
+        </div>
+        <div class="form-group">
+            <label for="username">Username *</label>
+            <input type="text" id="username" name="username" required minlength="3" maxlength="50" value="<?= e($user['username']) ?>">
         </div>
         <div class="form-group">
             <label for="password">Reset Password (optional)</label>
