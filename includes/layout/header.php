@@ -43,14 +43,18 @@ $pendingAlertTotal = array_sum(array_column($pendingAlerts, 'count'));
                             <div class="topbar-alerts-empty"><?= e(t('topbar.all_caught_up')) ?></div>
                         <?php else: ?>
                             <?php foreach ($pendingAlerts as $alert): ?>
-                                <a href="<?= e($alert['url']) ?>"><?= icon('bell') ?> <span><strong><?= $alert['count'] ?></strong> <?= e($alert['label']) ?></span></a>
+                                <a href="<?= e($alert['url']) ?>"><?= icon('bell') ?> <span><?= e($alert['text']) ?></span></a>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </div>
                 </div>
                 <div class="topbar-dropdown">
                     <button type="button" class="topbar-user-btn" data-dropdown-toggle="userMenu">
-                        <span class="topbar-avatar"><?= e(mb_strtoupper(mb_substr($user['name'] ?? 'A', 0, 1))) ?></span>
+                        <?php if (!empty($user['profile_picture'])): ?>
+                            <img class="topbar-avatar topbar-avatar-img" src="<?= e($user['profile_picture']) ?>" alt="">
+                        <?php else: ?>
+                            <span class="topbar-avatar"><?= e(mb_strtoupper(mb_substr($user['name'] ?? 'A', 0, 1))) ?></span>
+                        <?php endif; ?>
                         <span class="topbar-user-info">
                             <span class="topbar-user-name"><?= e($user['name'] ?? 'Account') ?></span>
                             <span class="topbar-role"><?= e($user['role_name'] ?? '') ?></span>

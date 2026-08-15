@@ -40,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['name']             = $user['name'];
                 $_SESSION['email']             = $user['email'];
                 $_SESSION['username']          = $user['username'];
+                $_SESSION['profile_picture']    = $user['profile_picture'];
                 $_SESSION['role_id']            = (int) $user['role_id'];
                 $_SESSION['role_name']           = $user['role_name'];
                 $_SESSION['department_id']        = $user['department_id'] !== null ? (int) $user['department_id'] : null;

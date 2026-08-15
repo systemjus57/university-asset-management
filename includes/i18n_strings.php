@@ -36,10 +36,18 @@ return [
     'topbar.my_profile'       => ['en' => 'My Profile', 'so' => 'Astaantayda'],
     'topbar.logout'           => ['en' => 'Logout', 'so' => 'Ka Bax'],
 
-    // Pending alerts (functions.php: getPendingAlerts)
+    // Pending alerts (functions.php: getPendingAlerts) — aggregate counts awaiting action
     'alert.maintenance' => ['en' => 'open maintenance ticket', 'so' => 'shaqo dayactir oo furan'],
     'alert.disposal'    => ['en' => 'pending disposal', 'so' => 'codsi ka saarid ah oo sugaya'],
     'alert.requisition' => ['en' => 'pending requisition', 'so' => 'codsi alaab oo sugaya'],
+
+    // Personal decision notifications — %s is filled with a category/asset name via sprintf()
+    'alert.requisition.approved' => ['en' => 'Your requisition for %s was approved.', 'so' => 'Codsigaaga %s ayaa la ansixiyay.'],
+    'alert.requisition.rejected' => ['en' => 'Your requisition for %s was rejected.', 'so' => 'Codsigaaga %s waa la diiday.'],
+    'alert.requisition.issued'   => ['en' => 'Your requisition for %s has been issued.', 'so' => 'Codsigaaga %s waa la bixiyay.'],
+    'alert.disposal.approved'    => ['en' => 'Your disposal request for %s was approved.', 'so' => 'Codsigaaga ka saaridda %s ayaa la ansixiyay.'],
+    'alert.disposal.rejected'    => ['en' => 'Your disposal request for %s was rejected.', 'so' => 'Codsigaaga ka saaridda %s waa la diiday.'],
+    'alert.maintenance.completed' => ['en' => 'Your reported issue for %s has been resolved.', 'so' => 'Dhibaatada aad ka warbixisay %s waa la xaliyay.'],
 
     // Footer
     'footer.system_name' => ['en' => 'University Asset Management System', 'so' => 'Nidaamka Maaraynta Hantida Jaamacadda'],

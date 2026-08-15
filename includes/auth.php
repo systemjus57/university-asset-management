@@ -25,6 +25,7 @@ function currentUser(): ?array
         'name'            => $_SESSION['name'],
         'email'            => $_SESSION['email'],
         'username'          => $_SESSION['username'] ?? null,
+        'profile_picture'    => $_SESSION['profile_picture'] ?? null,
         'role_id'          => $_SESSION['role_id'],
         'role_name'         => $_SESSION['role_name'],
         'department_id'      => $_SESSION['department_id'],

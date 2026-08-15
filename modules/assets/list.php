@@ -25,8 +25,9 @@ if ($isHead) {
 }
 
 if ($q !== '') {
-    $where[] = '(a.name LIKE :q OR a.serial_no LIKE :q)';
-    $params['q'] = "%$q%";
+    $where[] = '(a.name LIKE :q1 OR a.serial_no LIKE :q2)';
+    $params['q1'] = "%$q%";
+    $params['q2'] = "%$q%";
 }
 if ($categoryId !== '') {
     $where[] = 'a.category_id = :category_id';
@@ -50,7 +51,7 @@ $sql = "SELECT a.*, c.category_name, d.department_name, l.location_name
         LEFT JOIN departments d ON d.department_id = a.department_id
         LEFT JOIN locations l ON l.location_id = a.location_id
         $whereSql
-        ORDER BY a.asset_id DESC
+        ORDER BY a.asset_id ASC
         LIMIT :limit OFFSET :offset";
 $stmt = $pdo->prepare($sql);
 foreach ($params as $k => $v) {

@@ -157,7 +157,13 @@ function appLogoUrl(PDO $pdo): string
     return $logoPath !== '' ? $logoPath : APP_URL . '/static/images/logo.webp';
 }
 
-/** Role-scoped list of items awaiting the current user's attention, for the topbar notification bell. */
+/**
+ * Notification list for the topbar bell: items awaiting the current user's
+ * action (role-scoped pending counts) plus recent decisions on things they
+ * personally submitted (their own requisitions/disposals/maintenance
+ * reports), so a submitter finds out what happened to their request and
+ * not just approvers seeing what's queued up.
+ */
 function getPendingAlerts(PDO $pdo): array
 {
     if (!isLoggedIn()) {
@@ -167,7 +173,12 @@ function getPendingAlerts(PDO $pdo): array
     $alerts = [];
     $isHead = hasRole([ROLE_HEAD]);
     $deptId = $_SESSION['department_id'] ?? null;
+    $userId = (int) $_SESSION['user_id'];
 
+    // English pluralizes with a trailing 's'; Somali nouns don't inflect for count here, so the suffix is skipped.
+    $plural = fn (int $count) => (activeLanguage() === 'en' && $count !== 1) ? 's' : '';
+
+    // ---- Pending items awaiting this user's action (role-scoped counts) ----
     if ($isHead) {
         $stmt = $pdo->prepare(
             "SELECT COUNT(*) FROM asset_maintenance m JOIN assets a ON a.asset_id = m.asset_id
@@ -178,17 +189,14 @@ function getPendingAlerts(PDO $pdo): array
     } else {
         $maintenanceCount = (int) $pdo->query("SELECT COUNT(*) FROM asset_maintenance WHERE status IN ('pending','in_progress')")->fetchColumn();
     }
-    // English pluralizes with a trailing 's'; Somali nouns don't inflect for count here, so the suffix is skipped.
-    $plural = fn (int $count) => (activeLanguage() === 'en' && $count !== 1) ? 's' : '';
-
     if ($maintenanceCount > 0) {
-        $alerts[] = ['count' => $maintenanceCount, 'label' => t('alert.maintenance') . $plural($maintenanceCount), 'url' => APP_URL . '/modules/maintenance/list.php'];
+        $alerts[] = ['count' => $maintenanceCount, 'text' => $maintenanceCount . ' ' . t('alert.maintenance') . $plural($maintenanceCount), 'url' => APP_URL . '/modules/maintenance/list.php'];
     }
 
     if (hasRole([ROLE_ADMIN, ROLE_OFFICER, ROLE_TOPMGMT])) {
         $disposalCount = (int) $pdo->query("SELECT COUNT(*) FROM asset_disposals WHERE status = 'pending'")->fetchColumn();
         if ($disposalCount > 0) {
-            $alerts[] = ['count' => $disposalCount, 'label' => t('alert.disposal') . $plural($disposalCount), 'url' => APP_URL . '/modules/disposals/list.php'];
+            $alerts[] = ['count' => $disposalCount, 'text' => $disposalCount . ' ' . t('alert.disposal') . $plural($disposalCount), 'url' => APP_URL . '/modules/disposals/list.php'];
         }
     }
 
@@ -202,7 +210,45 @@ function getPendingAlerts(PDO $pdo): array
         $requisitionCount = 0;
     }
     if ($requisitionCount > 0) {
-        $alerts[] = ['count' => $requisitionCount, 'label' => t('alert.requisition') . $plural($requisitionCount), 'url' => APP_URL . '/modules/requisitions/list.php'];
+        $alerts[] = ['count' => $requisitionCount, 'text' => $requisitionCount . ' ' . t('alert.requisition') . $plural($requisitionCount), 'url' => APP_URL . '/modules/requisitions/list.php'];
+    }
+
+    // ---- Recent decisions on things this user personally submitted (last 7 days) ----
+    $stmt = $pdo->prepare(
+        "SELECT r.status, c.category_name FROM requisitions r
+         LEFT JOIN categories c ON c.category_id = r.category_id
+         WHERE r.requester_id = :uid AND r.status IN ('approved','rejected','issued')
+           AND r.updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+         ORDER BY r.updated_at DESC LIMIT 5"
+    );
+    $stmt->execute(['uid' => $userId]);
+    foreach ($stmt->fetchAll() as $r) {
+        $subject = $r['category_name'] ?? t('nav.requisitions');
+        $alerts[] = ['count' => 1, 'text' => sprintf(t('alert.requisition.' . $r['status']), $subject), 'url' => APP_URL . '/modules/requisitions/list.php'];
+    }
+
+    $stmt = $pdo->prepare(
+        "SELECT ds.status, a.name AS asset_name FROM asset_disposals ds
+         JOIN assets a ON a.asset_id = ds.asset_id
+         WHERE ds.requested_by = :uid AND ds.status IN ('approved','rejected')
+           AND ds.updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+         ORDER BY ds.updated_at DESC LIMIT 5"
+    );
+    $stmt->execute(['uid' => $userId]);
+    foreach ($stmt->fetchAll() as $r) {
+        $alerts[] = ['count' => 1, 'text' => sprintf(t('alert.disposal.' . $r['status']), $r['asset_name']), 'url' => APP_URL . '/modules/disposals/list.php'];
+    }
+
+    $stmt = $pdo->prepare(
+        "SELECT a.name AS asset_name FROM asset_maintenance m
+         JOIN assets a ON a.asset_id = m.asset_id
+         WHERE m.reported_by = :uid AND m.status = 'completed'
+           AND m.updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+         ORDER BY m.updated_at DESC LIMIT 5"
+    );
+    $stmt->execute(['uid' => $userId]);
+    foreach ($stmt->fetchAll() as $r) {
+        $alerts[] = ['count' => 1, 'text' => sprintf(t('alert.maintenance.completed'), $r['asset_name']), 'url' => APP_URL . '/modules/maintenance/list.php'];
     }
 
     return $alerts;
