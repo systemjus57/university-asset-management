@@ -41,6 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Logo must be a JPG, PNG, or GIF image.';
         } elseif ($_FILES['logo']['size'] > 2 * 1024 * 1024) {
             $errors[] = 'Logo must be smaller than 2MB.';
+        } elseif (!isValidImageUpload($_FILES['logo']['tmp_name'])) {
+            $errors[] = 'That file is not a valid image.';
         } else {
             $newName = 'logo_' . bin2hex(random_bytes(6)) . '.' . $ext;
             $destination = APP_ROOT . '/uploads/logos/' . $newName;

@@ -2,7 +2,9 @@
 /**
  * Shared form fields for add.php / edit.php.
  * Expects: $asset (array of current values, empty array for a new asset),
- * $categories, $departments, $locations, $errors (array).
+ * $categories, $departments, $locations, $errors (array),
+ * $committedQuantity (int, only set on edit — quantity already allocated/
+ * in maintenance/disposed, used as the minimum allowed on save).
  */
 ?>
 <?php if ($errors): ?>
@@ -58,13 +60,9 @@
             </select>
         </div>
         <div class="form-group">
-            <label for="status">Status *</label>
-            <select id="status" name="status" required <?= isset($asset['asset_id']) ? '' : '' ?>>
-                <option value="active" <?= ($asset['status'] ?? 'active') === 'active' ? 'selected' : '' ?>>Active</option>
-                <option value="under_repair" <?= ($asset['status'] ?? '') === 'under_repair' ? 'selected' : '' ?>>Under Repair</option>
-                <option value="disposed" <?= ($asset['status'] ?? '') === 'disposed' ? 'selected' : '' ?>>Disposed</option>
-            </select>
-            <small class="text-muted">Normally set automatically by maintenance/disposal records — override only for data correction.</small>
+            <label>Status</label>
+            <div><?= statusBadge($asset['status'] ?? 'active') ?></div>
+            <small class="text-muted">Derived automatically from quantity, allocations, maintenance, and disposal records — not editable directly.</small>
         </div>
     </div>
 
@@ -74,8 +72,18 @@
             <input type="date" id="purchase_date" name="purchase_date" required value="<?= e($asset['purchase_date'] ?? '') ?>">
         </div>
         <div class="form-group">
-            <label for="purchase_cost">Purchase Cost (USD) *</label>
+            <label for="purchase_cost">Purchase Cost per Unit (USD) *</label>
             <input type="number" id="purchase_cost" name="purchase_cost" step="0.01" min="0" required value="<?= e($asset['purchase_cost'] ?? '') ?>">
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="quantity">Quantity *</label>
+            <input type="number" id="quantity" name="quantity" step="1" min="<?= max(1, (int) ($committedQuantity ?? 1)) ?>" required value="<?= e($asset['quantity'] ?? '1') ?>">
+            <?php if (!empty($committedQuantity)): ?>
+                <small class="text-muted"><?= (int) $committedQuantity ?> unit<?= $committedQuantity == 1 ? '' : 's' ?> currently allocated, in maintenance, or disposed — quantity can't go below that.</small>
+            <?php endif; ?>
         </div>
     </div>
 

@@ -44,6 +44,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'id'            => $id,
         ]);
         logActivity($pdo, $_SESSION['user_id'], 'Review Requisition', 'requisitions', "Requisition #$id set to $decision.");
+        notifyUser(
+            $pdo, (int) $req['requester_id'],
+            'Requisition ' . $decision,
+            'Your requisition for "' . $req['purpose'] . '" was ' . $decision . '.',
+            $decision === 'rejected' ? 'warning' : 'success', 'requisitions', $id
+        );
         flash('success', "Requisition marked as $decision.");
         redirect(APP_URL . '/modules/requisitions/list.php');
     }

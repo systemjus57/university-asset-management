@@ -1,0 +1,13 @@
+PHPMailer — vendored dependency
+================================
+
+Source:  https://github.com/PHPMailer/PHPMailer
+Version: 7.1.1 (src/PHPMailer.php, src/SMTP.php, src/Exception.php only —
+         no autoloader, no Composer; required by hand from
+         includes/mailer.php, matching this project's existing vendor/fpdf
+         pattern)
+License: GNU Lesser General Public License v2.1 (LGPL-2.1)
+         https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+
+Each vendored file carries its own original PHPMailer license header.
+No modifications were made to the vendored source files themselves.

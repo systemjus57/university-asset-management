@@ -56,6 +56,7 @@ include __DIR__ . '/../../includes/layout/header.php';
     <thead>
         <tr>
             <th data-sort>Asset</th>
+            <th data-sort>Qty</th>
             <th class="no-sort">Issue</th>
             <th data-sort>Reported</th>
             <th data-sort>Reported By</th>
@@ -66,10 +67,11 @@ include __DIR__ . '/../../includes/layout/header.php';
         </tr>
     </thead>
     <tbody>
-    <?php if (!$rows): ?><tr class="empty-row"><td colspan="8">No maintenance records found.</td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr class="empty-row"><td colspan="9">No maintenance records found.</td></tr><?php endif; ?>
     <?php foreach ($rows as $r): ?>
         <tr>
             <td><a href="<?= APP_URL ?>/modules/assets/view.php?id=<?= (int) $r['asset_id'] ?>"><?= e($r['asset_name']) ?></a></td>
+            <td><?= (int) $r['quantity'] ?></td>
             <td><?= e($r['issue_description']) ?></td>
             <td><?= formatDate($r['reported_date']) ?></td>
             <td><?= e($r['reported_by_name'] ?? '—') ?></td>

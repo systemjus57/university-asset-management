@@ -50,6 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Profile picture must be a JPG, PNG, or GIF image.';
             } elseif ($_FILES['profile_picture']['size'] > 2 * 1024 * 1024) {
                 $errors[] = 'Profile picture must be smaller than 2MB.';
+            } elseif (!isValidImageUpload($_FILES['profile_picture']['tmp_name'])) {
+                $errors[] = 'That file is not a valid image.';
             } else {
                 $newName = 'avatar_' . $userId . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
                 $destination = APP_ROOT . '/uploads/avatars/' . $newName;

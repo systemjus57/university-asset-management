@@ -42,7 +42,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'purpose'          => $input['purpose'],
             'description'      => $input['description'] !== '' ? $input['description'] : null,
         ]);
+        $newId = (int) $pdo->lastInsertId();
         logActivity($pdo, $_SESSION['user_id'], 'Submit Requisition', 'requisitions', 'Submitted a new asset requisition.');
+        notifyUsersByRole(
+            $pdo, [ROLE_ADMIN, ROLE_OFFICER],
+            'New requisition submitted',
+            $_SESSION['name'] . ' submitted a requisition for review: ' . $input['purpose'],
+            'info', 'requisitions', $newId
+        );
         flash('success', 'Requisition submitted for review.');
         redirect(APP_URL . '/modules/requisitions/list.php');
     }

@@ -8,8 +8,10 @@ $roleId = $_GET['role_id'] ?? '';
 $where  = [];
 $params = [];
 if ($q !== '') {
-    $where[] = '(u.name LIKE :q OR u.email LIKE :q OR u.username LIKE :q)';
-    $params['q'] = "%$q%";
+    $where[] = '(u.name LIKE :q1 OR u.email LIKE :q2 OR u.username LIKE :q3)';
+    $params['q1'] = "%$q%";
+    $params['q2'] = "%$q%";
+    $params['q3'] = "%$q%";
 }
 if ($roleId !== '') {
     $where[] = 'u.role_id = :role_id';

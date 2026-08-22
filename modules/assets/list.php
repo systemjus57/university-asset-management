@@ -126,14 +126,16 @@ include __DIR__ . '/../../includes/layout/header.php';
             <th data-sort>Serial No.</th>
             <th data-sort>Department</th>
             <th data-sort>Location</th>
-            <th data-sort>Cost</th>
+            <th data-sort>Quantity</th>
+            <th data-sort>Unit Cost</th>
+            <th data-sort>Total Value</th>
             <th data-sort>Status</th>
             <th class="no-sort">Actions</th>
         </tr>
     </thead>
     <tbody>
     <?php if (!$assets): ?>
-        <tr class="empty-row"><td colspan="9">No assets found matching your filters.</td></tr>
+        <tr class="empty-row"><td colspan="11">No assets found matching your filters.</td></tr>
     <?php endif; ?>
     <?php foreach ($assets as $a): ?>
         <tr>
@@ -143,7 +145,9 @@ include __DIR__ . '/../../includes/layout/header.php';
             <td><?= e($a['serial_no'] ?? '—') ?></td>
             <td><?= e($a['department_name'] ?? '—') ?></td>
             <td><?= e($a['location_name'] ?? '—') ?></td>
+            <td><?= (int) getAvailableQuantity($pdo, (int) $a['asset_id']) ?> / <?= (int) $a['quantity'] ?></td>
             <td><?= formatMoney($a['purchase_cost']) ?></td>
+            <td><?= formatMoney($a['purchase_cost'] * $a['quantity']) ?></td>
             <td><?= statusBadge($a['status']) ?></td>
             <td class="table-actions">
                 <a class="btn btn-sm btn-outline" href="<?= APP_URL ?>/modules/assets/view.php?id=<?= (int) $a['asset_id'] ?>">View</a>

@@ -213,45 +213,74 @@ function getPendingAlerts(PDO $pdo): array
         $alerts[] = ['count' => $requisitionCount, 'text' => $requisitionCount . ' ' . t('alert.requisition') . $plural($requisitionCount), 'url' => APP_URL . '/modules/requisitions/list.php'];
     }
 
-    // ---- Recent decisions on things this user personally submitted (last 7 days) ----
-    $stmt = $pdo->prepare(
-        "SELECT r.status, c.category_name FROM requisitions r
-         LEFT JOIN categories c ON c.category_id = r.category_id
-         WHERE r.requester_id = :uid AND r.status IN ('approved','rejected','issued')
-           AND r.updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-         ORDER BY r.updated_at DESC LIMIT 5"
-    );
-    $stmt->execute(['uid' => $userId]);
-    foreach ($stmt->fetchAll() as $r) {
-        $subject = $r['category_name'] ?? t('nav.requisitions');
-        $alerts[] = ['count' => 1, 'text' => sprintf(t('alert.requisition.' . $r['status']), $subject), 'url' => APP_URL . '/modules/requisitions/list.php'];
-    }
-
-    $stmt = $pdo->prepare(
-        "SELECT ds.status, a.name AS asset_name FROM asset_disposals ds
-         JOIN assets a ON a.asset_id = ds.asset_id
-         WHERE ds.requested_by = :uid AND ds.status IN ('approved','rejected')
-           AND ds.updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-         ORDER BY ds.updated_at DESC LIMIT 5"
-    );
-    $stmt->execute(['uid' => $userId]);
-    foreach ($stmt->fetchAll() as $r) {
-        $alerts[] = ['count' => 1, 'text' => sprintf(t('alert.disposal.' . $r['status']), $r['asset_name']), 'url' => APP_URL . '/modules/disposals/list.php'];
-    }
-
-    $stmt = $pdo->prepare(
-        "SELECT a.name AS asset_name FROM asset_maintenance m
-         JOIN assets a ON a.asset_id = m.asset_id
-         WHERE m.reported_by = :uid AND m.status = 'completed'
-           AND m.updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-         ORDER BY m.updated_at DESC LIMIT 5"
-    );
-    $stmt->execute(['uid' => $userId]);
-    foreach ($stmt->fetchAll() as $r) {
-        $alerts[] = ['count' => 1, 'text' => sprintf(t('alert.maintenance.completed'), $r['asset_name']), 'url' => APP_URL . '/modules/maintenance/list.php'];
-    }
+    // Recent decisions on things this user personally submitted used to be computed
+    // live here on every page load (and vanished on refresh, since nothing was ever
+    // stored). They're now real rows in `notifications`, inserted at the point each
+    // decision is made (requisitions/review.php, disposals/approve.php,
+    // maintenance/update.php, transfers/add.php) — see getUserNotifications().
 
     return $alerts;
+}
+
+/** Inserts one persistent notification for a single user. */
+function notifyUser(PDO $pdo, int $userId, string $title, string $message, string $type = 'info', ?string $module = null, ?int $relatedId = null): void
+{
+    $stmt = $pdo->prepare(
+        'INSERT INTO notifications (user_id, title, message, type, module, related_id)
+         VALUES (:user_id, :title, :message, :type, :module, :related_id)'
+    );
+    $stmt->execute([
+        'user_id'    => $userId,
+        'title'      => $title,
+        'message'    => $message,
+        'type'       => $type,
+        'module'     => $module,
+        'related_id' => $relatedId,
+    ]);
+}
+
+/** Notifies every active user holding any of the given role names (e.g. all approvers). */
+function notifyUsersByRole(PDO $pdo, array $roleNames, string $title, string $message, string $type = 'info', ?string $module = null, ?int $relatedId = null): void
+{
+    $placeholders = implode(',', array_fill(0, count($roleNames), '?'));
+    $stmt = $pdo->prepare(
+        "SELECT u.user_id FROM users u JOIN roles r ON r.role_id = u.role_id
+         WHERE r.role_name IN ($placeholders) AND u.status = 'active'"
+    );
+    $stmt->execute($roleNames);
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $userId) {
+        notifyUser($pdo, (int) $userId, $title, $message, $type, $module, $relatedId);
+    }
+}
+
+/** Most recent notifications for the topbar bell, newest first. */
+function getUserNotifications(PDO $pdo, int $userId, int $limit = 10): array
+{
+    $stmt = $pdo->prepare('SELECT * FROM notifications WHERE user_id = :uid ORDER BY created_at DESC LIMIT ' . (int) $limit);
+    $stmt->execute(['uid' => $userId]);
+    return $stmt->fetchAll();
+}
+
+function getUnreadNotificationCount(PDO $pdo, int $userId): int
+{
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = :uid AND is_read = 0");
+    $stmt->execute(['uid' => $userId]);
+    return (int) $stmt->fetchColumn();
+}
+
+/** Marks one notification read — scoped to $userId so a user can't mark someone else's as read. */
+function markNotificationRead(PDO $pdo, int $notificationId, int $userId): void
+{
+    $stmt = $pdo->prepare(
+        "UPDATE notifications SET is_read = 1, read_at = NOW() WHERE notification_id = :id AND user_id = :uid"
+    );
+    $stmt->execute(['id' => $notificationId, 'uid' => $userId]);
+}
+
+function markAllNotificationsRead(PDO $pdo, int $userId): void
+{
+    $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1, read_at = NOW() WHERE user_id = :uid AND is_read = 0");
+    $stmt->execute(['uid' => $userId]);
 }
 
 /**
@@ -274,35 +303,35 @@ function getReportRows(PDO $pdo, string $report, bool $isHead, ?int $deptId, str
     $rows   = [];
 
     if ($report === 'by_department') {
-        $header = ['Department', 'Asset Count', 'Total Value'];
-        $sql = "SELECT d.department_name, COUNT(a.asset_id) AS asset_count, COALESCE(SUM(a.purchase_cost),0) AS total_value
+        $header = ['Department', 'Asset Records', 'Total Quantity', 'Total Value'];
+        $sql = "SELECT d.department_name, COUNT(a.asset_id) AS asset_count, COALESCE(SUM(a.quantity),0) AS total_quantity, COALESCE(SUM(a.quantity * a.purchase_cost),0) AS total_value
                 FROM departments d LEFT JOIN assets a ON a.department_id = d.department_id
                 " . ($isHead ? 'WHERE d.department_id = :dept' : '') . "
                 GROUP BY d.department_id, d.department_name ORDER BY d.department_name";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($isHead ? ['dept' => $deptId] : []);
         foreach ($stmt->fetchAll() as $r) {
-            $rows[] = [$r['department_name'], (string) $r['asset_count'], number_format((float) $r['total_value'], 2)];
+            $rows[] = [$r['department_name'], (string) $r['asset_count'], (string) $r['total_quantity'], number_format((float) $r['total_value'], 2)];
         }
     } elseif ($report === 'by_category') {
-        $header = ['Category', 'Asset Count', 'Total Value'];
+        $header = ['Category', 'Asset Records', 'Total Quantity', 'Total Value'];
         $where = $isHead ? 'WHERE a.department_id = :dept' : '';
-        $sql = "SELECT c.category_name, COUNT(a.asset_id) AS asset_count, COALESCE(SUM(a.purchase_cost),0) AS total_value
+        $sql = "SELECT c.category_name, COUNT(a.asset_id) AS asset_count, COALESCE(SUM(a.quantity),0) AS total_quantity, COALESCE(SUM(a.quantity * a.purchase_cost),0) AS total_value
                 FROM categories c LEFT JOIN assets a ON a.category_id = c.category_id $where
                 GROUP BY c.category_id, c.category_name ORDER BY c.category_name";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($isHead ? ['dept' => $deptId] : []);
         foreach ($stmt->fetchAll() as $r) {
-            $rows[] = [$r['category_name'], (string) $r['asset_count'], number_format((float) $r['total_value'], 2)];
+            $rows[] = [$r['category_name'], (string) $r['asset_count'], (string) $r['total_quantity'], number_format((float) $r['total_value'], 2)];
         }
     } elseif ($report === 'by_status') {
-        $header = ['Status', 'Asset Count', 'Total Value'];
+        $header = ['Status', 'Asset Records', 'Total Quantity', 'Total Value'];
         $where = $isHead ? 'WHERE department_id = :dept' : '';
-        $sql = "SELECT status, COUNT(*) AS asset_count, COALESCE(SUM(purchase_cost),0) AS total_value FROM assets $where GROUP BY status";
+        $sql = "SELECT status, COUNT(*) AS asset_count, COALESCE(SUM(quantity),0) AS total_quantity, COALESCE(SUM(quantity * purchase_cost),0) AS total_value FROM assets $where GROUP BY status";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($isHead ? ['dept' => $deptId] : []);
         foreach ($stmt->fetchAll() as $r) {
-            $rows[] = [ucwords(str_replace('_', ' ', $r['status'])), (string) $r['asset_count'], number_format((float) $r['total_value'], 2)];
+            $rows[] = [ucwords(str_replace('_', ' ', $r['status'])), (string) $r['asset_count'], (string) $r['total_quantity'], number_format((float) $r['total_value'], 2)];
         }
     } elseif ($report === 'maintenance_cost') {
         $header = ['Asset', 'Completed Date', 'Cost', 'Technician/Vendor'];
@@ -398,30 +427,127 @@ function setSetting(PDO $pdo, string $key, string $value): void
 }
 
 /**
+ * Sums how many units of an asset are tied up by open/active records in a
+ * given table, scoped to that asset. Shared by getAvailableQuantity() and
+ * recomputeAssetStatus() so the "what's committed" math lives in one place.
+ */
+function sumCommittedQuantity(PDO $pdo, string $table, int $assetId, string $statusColumn, array $statuses): int
+{
+    $placeholders = implode(',', array_fill(0, count($statuses), '?'));
+    $stmt = $pdo->prepare(
+        "SELECT COALESCE(SUM(quantity),0) FROM $table WHERE asset_id = ? AND $statusColumn IN ($placeholders)"
+    );
+    $stmt->execute(array_merge([$assetId], $statuses));
+    return (int) $stmt->fetchColumn();
+}
+
+/**
+ * How many units of an asset are free to allocate/transfer/send to
+ * maintenance/dispose right now. Computed on demand from the asset's total
+ * quantity minus whatever's currently committed elsewhere, rather than
+ * stored as a running counter — a running counter is exactly what let the
+ * old boolean `status` column drift out of sync with reality.
+ */
+function getAvailableQuantity(PDO $pdo, int $assetId): int
+{
+    $stmt = $pdo->prepare('SELECT quantity FROM assets WHERE asset_id = :id');
+    $stmt->execute(['id' => $assetId]);
+    $total = (int) $stmt->fetchColumn();
+
+    $allocated   = sumCommittedQuantity($pdo, 'asset_assigned', $assetId, 'status', ['active']);
+    $maintenance = sumCommittedQuantity($pdo, 'asset_maintenance', $assetId, 'status', ['pending', 'in_progress']);
+    $disposed    = sumCommittedQuantity($pdo, 'asset_disposals', $assetId, 'status', ['approved']);
+
+    return $total - $allocated - $maintenance - $disposed;
+}
+
+/**
  * Recomputes an asset's status from its related records rather than letting
- * it be hand-edited: approved disposal wins, then any open maintenance
- * ticket, otherwise the asset is active. Called after any action that
- * touches maintenance or disposals for the asset.
+ * it be hand-edited: quantity-aware — disposed wins once disposed quantity
+ * reaches the total, under_repair once every remaining (non-disposed) unit
+ * is tied up in open maintenance, otherwise active. Called after any action
+ * that touches maintenance or disposals for the asset.
  */
 function recomputeAssetStatus(PDO $pdo, int $assetId): void
 {
-    $disposed = $pdo->prepare("SELECT 1 FROM asset_disposals WHERE asset_id = :id AND status = 'approved' LIMIT 1");
-    $disposed->execute(['id' => $assetId]);
-    if ($disposed->fetch()) {
-        $pdo->prepare("UPDATE assets SET status = 'disposed' WHERE asset_id = :id")->execute(['id' => $assetId]);
-        return;
+    $stmt = $pdo->prepare('SELECT quantity FROM assets WHERE asset_id = :id');
+    $stmt->execute(['id' => $assetId]);
+    $total = (int) $stmt->fetchColumn();
+
+    $disposed    = sumCommittedQuantity($pdo, 'asset_disposals', $assetId, 'status', ['approved']);
+    $maintenance = sumCommittedQuantity($pdo, 'asset_maintenance', $assetId, 'status', ['pending', 'in_progress']);
+
+    $remaining = $total - $disposed;
+
+    if ($remaining <= 0) {
+        $status = 'disposed';
+    } elseif ($maintenance > 0 && $maintenance >= $remaining) {
+        $status = 'under_repair';
+    } else {
+        $status = 'active';
     }
 
-    $underRepair = $pdo->prepare(
-        "SELECT 1 FROM asset_maintenance WHERE asset_id = :id AND status IN ('pending','in_progress') LIMIT 1"
-    );
-    $underRepair->execute(['id' => $assetId]);
-    if ($underRepair->fetch()) {
-        $pdo->prepare("UPDATE assets SET status = 'under_repair' WHERE asset_id = :id")->execute(['id' => $assetId]);
-        return;
+    $pdo->prepare('UPDATE assets SET status = :status WHERE asset_id = :id')
+        ->execute(['status' => $status, 'id' => $assetId]);
+}
+
+/**
+ * Confirms an uploaded file is actually a real image (not just named .jpg/.png),
+ * by decoding its header via getimagesize() rather than trusting the client-sent
+ * extension or MIME type — both are trivially spoofable (e.g. a PHP script
+ * renamed to avatar.jpg would pass an extension-only check).
+ */
+function isValidImageUpload(string $tmpPath): bool
+{
+    $info = @getimagesize($tmpPath);
+    if ($info === false) {
+        return false;
+    }
+    return in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP], true);
+}
+
+/**
+ * Full SQL dump of the database (schema + data), generated in pure PHP via
+ * SHOW CREATE TABLE / SELECT — no shell_exec / mysqldump dependency. Shared
+ * by the Settings > Backup download and by backup_restore.php, which saves
+ * one of these to storage/backups/ as a safety copy before running a
+ * destructive restore.
+ */
+function generateDatabaseDump(PDO $pdo): string
+{
+    $out = "-- University Asset Management System — database backup\n";
+    $out .= "-- Generated: " . date('Y-m-d H:i:s') . "\n";
+    $out .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
+
+    $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+
+    foreach ($tables as $table) {
+        $createStmt = $pdo->query('SHOW CREATE TABLE `' . $table . '`')->fetch();
+        $out .= "DROP TABLE IF EXISTS `$table`;\n";
+        $out .= $createStmt['Create Table'] . ";\n\n";
+
+        $rowCount = (int) $pdo->query('SELECT COUNT(*) FROM `' . $table . '`')->fetchColumn();
+        if ($rowCount === 0) {
+            continue;
+        }
+
+        $rowsStmt = $pdo->query('SELECT * FROM `' . $table . '`');
+        $columns = null;
+        while ($row = $rowsStmt->fetch(PDO::FETCH_ASSOC)) {
+            if ($columns === null) {
+                $columns = array_keys($row);
+            }
+            $values = array_map(function ($v) use ($pdo) {
+                return $v === null ? 'NULL' : $pdo->quote((string) $v);
+            }, array_values($row));
+            $out .= "INSERT INTO `$table` (`" . implode('`, `', $columns) . "`) VALUES (" . implode(', ', $values) . ");\n";
+        }
+        $out .= "\n";
     }
 
-    $pdo->prepare("UPDATE assets SET status = 'active' WHERE asset_id = :id")->execute(['id' => $assetId]);
+    $out .= "SET FOREIGN_KEY_CHECKS=1;\n";
+
+    return $out;
 }
 
 /** Simple required-field validator used by every add/edit handler. Returns list of error strings. */

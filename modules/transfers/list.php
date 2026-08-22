@@ -43,6 +43,7 @@ include __DIR__ . '/../../includes/layout/header.php';
     <thead>
         <tr>
             <th data-sort>Asset</th>
+            <th data-sort>Qty</th>
             <th data-sort>From</th>
             <th data-sort>To</th>
             <th data-sort>Transfer Date</th>
@@ -51,10 +52,11 @@ include __DIR__ . '/../../includes/layout/header.php';
         </tr>
     </thead>
     <tbody>
-    <?php if (!$rows): ?><tr class="empty-row"><td colspan="6">No transfer records found.</td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr class="empty-row"><td colspan="7">No transfer records found.</td></tr><?php endif; ?>
     <?php foreach ($rows as $r): ?>
         <tr>
             <td><a href="<?= APP_URL ?>/modules/assets/view.php?id=<?= (int) $r['asset_id'] ?>"><?= e($r['asset_name']) ?></a></td>
+            <td><?= (int) $r['quantity'] ?></td>
             <td><?= e($r['from_dept'] ?? '—') ?></td>
             <td><?= e($r['to_dept'] ?? '—') ?></td>
             <td><?= formatDate($r['transfer_date']) ?></td>

@@ -94,6 +94,7 @@ include __DIR__ . '/../../includes/layout/header.php';
     <thead>
         <tr>
             <th data-sort>Asset</th>
+            <th data-sort>Qty</th>
             <th data-sort>Department</th>
             <th data-sort>Custodian</th>
             <th data-sort>Assigned Date</th>
@@ -103,10 +104,11 @@ include __DIR__ . '/../../includes/layout/header.php';
         </tr>
     </thead>
     <tbody>
-    <?php if (!$rows): ?><tr class="empty-row"><td colspan="7">No allocation records found.</td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr class="empty-row"><td colspan="8">No allocation records found.</td></tr><?php endif; ?>
     <?php foreach ($rows as $r): ?>
         <tr>
             <td><a href="<?= APP_URL ?>/modules/assets/view.php?id=<?= (int) $r['asset_id'] ?>"><?= e($r['asset_name']) ?></a></td>
+            <td><?= (int) $r['quantity'] ?></td>
             <td><?= e($r['department_name'] ?? '—') ?></td>
             <td><?= e($r['custodian_name'] ?? '—') ?></td>
             <td><?= formatDate($r['assigned_date']) ?></td>

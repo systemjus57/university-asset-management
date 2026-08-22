@@ -56,6 +56,7 @@ include __DIR__ . '/../../includes/layout/header.php';
     <thead>
         <tr>
             <th data-sort>Asset</th>
+            <th data-sort>Qty</th>
             <th data-sort>Requested</th>
             <th data-sort>Method</th>
             <th class="no-sort">Reason</th>
@@ -67,10 +68,11 @@ include __DIR__ . '/../../includes/layout/header.php';
         </tr>
     </thead>
     <tbody>
-    <?php if (!$rows): ?><tr class="empty-row"><td colspan="9">No disposal records found.</td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr class="empty-row"><td colspan="10">No disposal records found.</td></tr><?php endif; ?>
     <?php foreach ($rows as $r): ?>
         <tr>
             <td><a href="<?= APP_URL ?>/modules/assets/view.php?id=<?= (int) $r['asset_id'] ?>"><?= e($r['asset_name']) ?></a></td>
+            <td><?= (int) $r['quantity'] ?></td>
             <td><?= formatDate($r['request_date']) ?></td>
             <td><?= e(ucfirst($r['method'])) ?></td>
             <td><?= e($r['reason']) ?></td>

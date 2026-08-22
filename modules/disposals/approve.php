@@ -55,6 +55,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         logActivity($pdo, $_SESSION['user_id'], 'Review Disposal', 'disposals', "Disposal #$id set to $decision.");
+        notifyUser(
+            $pdo, (int) $disposal['requested_by'],
+            'Disposal request ' . $decision,
+            'Your disposal request for "' . $disposal['asset_name'] . '" was ' . $decision . '.',
+            $decision === 'rejected' ? 'warning' : 'success', 'disposals', $id
+        );
         flash('success', "Disposal request $decision.");
         redirect(APP_URL . '/modules/disposals/list.php');
     }

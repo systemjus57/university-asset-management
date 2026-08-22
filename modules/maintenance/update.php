@@ -48,6 +48,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         recomputeAssetStatus($pdo, (int) $record['asset_id']);
         logActivity($pdo, $_SESSION['user_id'], 'Update Maintenance', 'maintenance', "Updated maintenance #$id to status $status.");
+        if ($status === 'completed' && (int) $record['reported_by'] !== (int) $_SESSION['user_id']) {
+            notifyUser(
+                $pdo, (int) $record['reported_by'],
+                'Maintenance completed',
+                'The maintenance issue you reported for "' . $record['asset_name'] . '" has been marked completed.',
+                'success', 'maintenance', $id
+            );
+        }
         flash('success', 'Maintenance record updated.');
         redirect(APP_URL . '/modules/maintenance/list.php');
     }

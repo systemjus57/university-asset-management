@@ -16,8 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'department_id'    => $_POST['department_id'] ?? '',
         'purchase_date'    => $_POST['purchase_date'] ?? '',
         'purchase_cost'    => $_POST['purchase_cost'] ?? '',
+        'quantity'         => $_POST['quantity'] ?? '1',
         'warranty_expiry'  => $_POST['warranty_expiry'] ?? '',
-        'status'           => $_POST['status'] ?? 'active',
         'description'      => clean($_POST['description'] ?? ''),
     ];
 
@@ -26,18 +26,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'category_id'   => 'Category',
         'purchase_date' => 'Purchase date',
         'purchase_cost' => 'Purchase cost',
+        'quantity'      => 'Quantity',
     ]);
     if (!is_numeric($asset['purchase_cost'] ?? '')) {
         $errors[] = 'Purchase cost must be a number.';
     }
-    if (!in_array($asset['status'], ['active', 'under_repair', 'disposed'], true)) {
-        $errors[] = 'Invalid status selected.';
+    if (!ctype_digit((string) $asset['quantity']) || (int) $asset['quantity'] < 1) {
+        $errors[] = 'Quantity must be a whole number of at least 1.';
     }
 
     if (!$errors) {
         $stmt = $pdo->prepare(
-            'INSERT INTO assets (name, category_id, serial_no, location_id, department_id, purchase_date, purchase_cost, warranty_expiry, status, description)
-             VALUES (:name, :category_id, :serial_no, :location_id, :department_id, :purchase_date, :purchase_cost, :warranty_expiry, :status, :description)'
+            'INSERT INTO assets (name, category_id, serial_no, location_id, department_id, purchase_date, purchase_cost, quantity, warranty_expiry, status, description)
+             VALUES (:name, :category_id, :serial_no, :location_id, :department_id, :purchase_date, :purchase_cost, :quantity, :warranty_expiry, "active", :description)'
         );
         $stmt->execute([
             'name'            => $asset['name'],
@@ -47,12 +48,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'department_id'   => $asset['department_id'] !== '' ? $asset['department_id'] : null,
             'purchase_date'   => $asset['purchase_date'],
             'purchase_cost'   => $asset['purchase_cost'],
+            'quantity'        => (int) $asset['quantity'],
             'warranty_expiry' => $asset['warranty_expiry'] !== '' ? $asset['warranty_expiry'] : null,
-            'status'          => $asset['status'],
             'description'     => $asset['description'] !== '' ? $asset['description'] : null,
         ]);
         $newId = (int) $pdo->lastInsertId();
-        logActivity($pdo, $_SESSION['user_id'], 'Create Asset', 'assets', "Registered asset #$newId ({$asset['name']}).");
+        logActivity($pdo, $_SESSION['user_id'], 'Create Asset', 'assets', "Registered asset #$newId ({$asset['name']}), quantity {$asset['quantity']}.");
         flash('success', 'Asset registered successfully.');
         redirect(APP_URL . '/modules/assets/view.php?id=' . $newId);
     }

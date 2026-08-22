@@ -40,17 +40,25 @@ include __DIR__ . '/../../includes/layout/header.php';
         <tr>
             <th data-sort>Asset</th>
             <th data-sort>Audit Date</th>
+            <th data-sort>Expected</th>
+            <th data-sort>Actual</th>
+            <th data-sort>Missing</th>
+            <th data-sort>Damaged</th>
             <th data-sort>Result</th>
             <th class="no-sort">Remarks</th>
             <th data-sort>Audited By</th>
         </tr>
     </thead>
     <tbody>
-    <?php if (!$rows): ?><tr class="empty-row"><td colspan="5">No audit records found.</td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr class="empty-row"><td colspan="9">No audit records found.</td></tr><?php endif; ?>
     <?php foreach ($rows as $r): ?>
         <tr>
             <td><a href="<?= APP_URL ?>/modules/assets/view.php?id=<?= (int) $r['asset_id'] ?>"><?= e($r['asset_name']) ?></a></td>
             <td><?= formatDate($r['audit_date']) ?></td>
+            <td><?= $r['expected_quantity'] !== null ? (int) $r['expected_quantity'] : '—' ?></td>
+            <td><?= $r['actual_quantity'] !== null ? (int) $r['actual_quantity'] : '—' ?></td>
+            <td><?= $r['missing_quantity'] !== null ? (int) $r['missing_quantity'] : '—' ?></td>
+            <td><?= $r['damaged_quantity'] !== null ? (int) $r['damaged_quantity'] : '—' ?></td>
             <td><?= statusBadge($r['result']) ?></td>
             <td><?= e($r['remarks'] ?? '—') ?></td>
             <td><?= e($r['audited_by_name'] ?? '—') ?></td>

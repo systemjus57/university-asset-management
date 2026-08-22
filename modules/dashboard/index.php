@@ -7,9 +7,11 @@ $deptId = $_SESSION['department_id'];
 
 $deptFilterAssets = $isHead ? 'WHERE department_id = :dept' : '';
 $deptParamsAssets = $isHead ? ['dept' => $deptId] : [];
-$stmt = $pdo->prepare("SELECT COUNT(*) FROM assets $deptFilterAssets");
+$stmt = $pdo->prepare("SELECT COUNT(*) AS records, COALESCE(SUM(quantity),0) AS quantity FROM assets $deptFilterAssets");
 $stmt->execute($deptParamsAssets);
-$totalAssets = (int) $stmt->fetchColumn();
+$assetTotals       = $stmt->fetch();
+$totalAssetRecords  = (int) $assetTotals['records'];
+$totalAssets        = (int) $assetTotals['quantity']; // total physical quantity — the headline number everywhere below
 
 $deptFilterAlloc = $isHead ? "AND assigned_to = :dept" : '';
 $stmt = $pdo->prepare("SELECT COUNT(*) FROM asset_assigned WHERE status = 'active' $deptFilterAlloc");
@@ -43,8 +45,9 @@ if (hasRole([ROLE_ADMIN, ROLE_OFFICER])) {
 
 $totalUsers = hasRole([ROLE_ADMIN]) ? (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() : null;
 
-// Asset status breakdown, for the "Assets by Status" donut + tile grid.
-$stmt = $pdo->prepare("SELECT status, COUNT(*) c FROM assets $deptFilterAssets GROUP BY status");
+// Asset status breakdown, for the "Assets by Status" donut + tile grid — summed by
+// quantity (physical units), not row count, so a 50-chair record counts as 50.
+$stmt = $pdo->prepare("SELECT status, COALESCE(SUM(quantity),0) c FROM assets $deptFilterAssets GROUP BY status");
 $stmt->execute($deptParamsAssets);
 $assetStatusCounts = ['active' => 0, 'under_repair' => 0, 'disposed' => 0];
 foreach ($stmt->fetchAll() as $row) {
@@ -134,6 +137,7 @@ include __DIR__ . '/../../includes/layout/header.php';
         <div class="stat-card-icon"><?= icon('assets') ?></div>
         <div class="stat-label"><?= $isHead ? e(t('dash.department_assets')) : e(t('dash.total_assets')) ?></div>
         <div class="stat-value"><?= $totalAssets ?></div>
+        <div class="text-muted" style="font-size:.8rem;"><?= $totalAssetRecords ?> asset record<?= $totalAssetRecords === 1 ? '' : 's' ?></div>
     </div>
     <div class="stat-card accent">
         <div class="stat-card-icon"><?= icon('allocations') ?></div>

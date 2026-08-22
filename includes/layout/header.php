@@ -10,6 +10,16 @@ $uniName    = isset($pdo) ? getSetting($pdo, 'university_name', 'Somali National
 $theme      = isset($pdo) ? getSetting($pdo, 'theme', 'light') : 'light';
 $pendingAlerts = isset($pdo) ? getPendingAlerts($pdo) : [];
 $pendingAlertTotal = array_sum(array_column($pendingAlerts, 'count'));
+$notifications = ($user && isset($pdo)) ? getUserNotifications($pdo, (int) $user['user_id'], 10) : [];
+$unreadNotificationCount = ($user && isset($pdo)) ? getUnreadNotificationCount($pdo, (int) $user['user_id']) : 0;
+$bellTotal = $pendingAlertTotal + $unreadNotificationCount;
+$notificationModuleUrls = [
+    'requisitions' => APP_URL . '/modules/requisitions/list.php',
+    'disposals'    => APP_URL . '/modules/disposals/list.php',
+    'maintenance'  => APP_URL . '/modules/maintenance/list.php',
+    'transfers'    => APP_URL . '/modules/transfers/list.php',
+    'auth'         => APP_URL . '/modules/profile/index.php',
+];
 ?>
 <!DOCTYPE html>
 <html lang="<?= e(activeLanguage()) ?>">
@@ -35,15 +45,46 @@ $pendingAlertTotal = array_sum(array_column($pendingAlerts, 'count'));
                 <div class="topbar-dropdown">
                     <button type="button" class="topbar-bell" aria-label="<?= e(t('topbar.notifications')) ?>" data-dropdown-toggle="alertsMenu">
                         <?= icon('bell') ?>
-                        <?php if ($pendingAlertTotal > 0): ?><span class="topbar-bell-badge"><?= $pendingAlertTotal > 9 ? '9+' : $pendingAlertTotal ?></span><?php endif; ?>
+                        <?php if ($bellTotal > 0): ?><span class="topbar-bell-badge"><?= $bellTotal > 9 ? '9+' : $bellTotal ?></span><?php endif; ?>
                     </button>
                     <div class="topbar-dropdown-menu topbar-alerts-menu" id="alertsMenu">
-                        <div class="topbar-alerts-header"><?= e(t('topbar.notifications')) ?></div>
-                        <?php if (!$pendingAlerts): ?>
-                            <div class="topbar-alerts-empty"><?= e(t('topbar.all_caught_up')) ?></div>
-                        <?php else: ?>
+                        <?php if ($pendingAlerts): ?>
+                            <div class="topbar-alerts-header">Needs Your Attention</div>
                             <?php foreach ($pendingAlerts as $alert): ?>
                                 <a href="<?= e($alert['url']) ?>"><?= icon('bell') ?> <span><?= e($alert['text']) ?></span></a>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+
+                        <div class="topbar-alerts-header" style="display:flex; align-items:center; justify-content:space-between;">
+                            <span><?= e(t('topbar.notifications')) ?></span>
+                            <?php if ($unreadNotificationCount > 0): ?>
+                                <form method="post" action="<?= APP_URL ?>/modules/notifications/mark_read.php" style="margin:0;">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="mark_all" value="1">
+                                    <input type="hidden" name="back" value="<?= e($_SERVER['REQUEST_URI'] ?? '') ?>">
+                                    <button type="submit" class="link-count" style="font-size:.75rem; font-weight:500;">Mark all read</button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
+                        <?php if (!$pendingAlerts && !$notifications): ?>
+                            <div class="topbar-alerts-empty"><?= e(t('topbar.all_caught_up')) ?></div>
+                        <?php elseif (!$notifications): ?>
+                            <div class="topbar-alerts-empty">No notifications yet.</div>
+                        <?php else: ?>
+                            <?php foreach ($notifications as $n): ?>
+                                <div class="topbar-alerts-item<?= $n['is_read'] ? '' : ' unread' ?>" style="display:flex; align-items:center; gap:.4rem;">
+                                    <a href="<?= e($notificationModuleUrls[$n['module']] ?? (APP_URL . '/modules/dashboard/index.php')) ?>" style="flex:1;">
+                                        <?= icon('bell') ?> <span><strong><?= e($n['title']) ?></strong> — <?= e($n['message']) ?></span>
+                                    </a>
+                                    <?php if (!$n['is_read']): ?>
+                                        <form method="post" action="<?= APP_URL ?>/modules/notifications/mark_read.php" style="margin:0;">
+                                            <?= csrfField() ?>
+                                            <input type="hidden" name="notification_id" value="<?= (int) $n['notification_id'] ?>">
+                                            <input type="hidden" name="back" value="<?= e($_SERVER['REQUEST_URI'] ?? '') ?>">
+                                            <button type="submit" class="link-count" style="font-size:.7rem;" title="Mark read">&#10003;</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </div>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </div>

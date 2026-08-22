@@ -96,8 +96,10 @@ include __DIR__ . '/../../includes/layout/header.php';
         <div class="detail-item"><div class="detail-label">Serial No.</div><div class="detail-value"><?= e($asset['serial_no'] ?? '—') ?></div></div>
         <div class="detail-item"><div class="detail-label">Custodian Department</div><div class="detail-value"><?= e($asset['department_name'] ?? '—') ?></div></div>
         <div class="detail-item"><div class="detail-label">Location</div><div class="detail-value"><?= e($asset['location_name'] ?? '—') ?></div></div>
+        <div class="detail-item"><div class="detail-label">Quantity</div><div class="detail-value"><?= (int) getAvailableQuantity($pdo, $assetId) ?> available / <?= (int) $asset['quantity'] ?> total</div></div>
         <div class="detail-item"><div class="detail-label">Purchase Date</div><div class="detail-value"><?= formatDate($asset['purchase_date']) ?></div></div>
-        <div class="detail-item"><div class="detail-label">Purchase Cost</div><div class="detail-value"><?= formatMoney($asset['purchase_cost']) ?></div></div>
+        <div class="detail-item"><div class="detail-label">Unit Cost</div><div class="detail-value"><?= formatMoney($asset['purchase_cost']) ?></div></div>
+        <div class="detail-item"><div class="detail-label">Total Value</div><div class="detail-value"><?= formatMoney($asset['purchase_cost'] * $asset['quantity']) ?></div></div>
         <div class="detail-item"><div class="detail-label">Warranty Expiry</div><div class="detail-value"><?= formatDate($asset['warranty_expiry']) ?></div></div>
         <div class="detail-item"><div class="detail-label">Registered On</div><div class="detail-value"><?= formatDate($asset['created_at']) ?></div></div>
     </div>
@@ -117,13 +119,14 @@ include __DIR__ . '/../../includes/layout/header.php';
 <div id="tab-alloc" class="tab-panel active">
     <div class="table-wrap">
     <table>
-        <thead><tr><th>Assigned To</th><th>Custodian</th><th>Assigned Date</th><th>Return Date</th><th>Status</th><th>Processed By</th></tr></thead>
+        <thead><tr><th>Assigned To</th><th>Custodian</th><th>Qty</th><th>Assigned Date</th><th>Return Date</th><th>Status</th><th>Processed By</th></tr></thead>
         <tbody>
-        <?php if (!$allocations): ?><tr class="empty-row"><td colspan="6">No allocation history.</td></tr><?php endif; ?>
+        <?php if (!$allocations): ?><tr class="empty-row"><td colspan="7">No allocation history.</td></tr><?php endif; ?>
         <?php foreach ($allocations as $al): ?>
             <tr>
                 <td><?= e($al['department_name'] ?? '—') ?></td>
                 <td><?= e($al['custodian_name'] ?? '—') ?></td>
+                <td><?= (int) $al['quantity'] ?></td>
                 <td><?= formatDate($al['assigned_date']) ?></td>
                 <td><?= formatDate($al['return_date']) ?></td>
                 <td><?= statusBadge($al['status']) ?></td>
@@ -138,13 +141,14 @@ include __DIR__ . '/../../includes/layout/header.php';
 <div id="tab-transfers" class="tab-panel">
     <div class="table-wrap">
     <table>
-        <thead><tr><th>From</th><th>To</th><th>Transfer Date</th><th>Reason</th><th>Handled By</th></tr></thead>
+        <thead><tr><th>From</th><th>To</th><th>Qty</th><th>Transfer Date</th><th>Reason</th><th>Handled By</th></tr></thead>
         <tbody>
-        <?php if (!$transfers): ?><tr class="empty-row"><td colspan="5">No transfer history.</td></tr><?php endif; ?>
+        <?php if (!$transfers): ?><tr class="empty-row"><td colspan="6">No transfer history.</td></tr><?php endif; ?>
         <?php foreach ($transfers as $t): ?>
             <tr>
                 <td><?= e($t['from_dept'] ?? '—') ?></td>
                 <td><?= e($t['to_dept'] ?? '—') ?></td>
+                <td><?= (int) $t['quantity'] ?></td>
                 <td><?= formatDate($t['transfer_date']) ?></td>
                 <td><?= e($t['reason'] ?? '—') ?></td>
                 <td><?= e($t['handled_by_name'] ?? '—') ?></td>
@@ -158,12 +162,13 @@ include __DIR__ . '/../../includes/layout/header.php';
 <div id="tab-maintenance" class="tab-panel">
     <div class="table-wrap">
     <table>
-        <thead><tr><th>Issue</th><th>Reported By</th><th>Reported</th><th>Status</th><th>Completed</th><th>Cost</th><th>Technician/Vendor</th></tr></thead>
+        <thead><tr><th>Issue</th><th>Qty</th><th>Reported By</th><th>Reported</th><th>Status</th><th>Completed</th><th>Cost</th><th>Technician/Vendor</th></tr></thead>
         <tbody>
-        <?php if (!$maintenance): ?><tr class="empty-row"><td colspan="7">No maintenance history.</td></tr><?php endif; ?>
+        <?php if (!$maintenance): ?><tr class="empty-row"><td colspan="8">No maintenance history.</td></tr><?php endif; ?>
         <?php foreach ($maintenance as $m): ?>
             <tr>
                 <td><?= e($m['issue_description']) ?></td>
+                <td><?= (int) $m['quantity'] ?></td>
                 <td><?= e($m['reported_by_name'] ?? '—') ?></td>
                 <td><?= formatDate($m['reported_date']) ?></td>
                 <td><?= statusBadge($m['status']) ?></td>
@@ -180,12 +185,16 @@ include __DIR__ . '/../../includes/layout/header.php';
 <div id="tab-audits" class="tab-panel">
     <div class="table-wrap">
     <table>
-        <thead><tr><th>Audit Date</th><th>Result</th><th>Remarks</th><th>Audited By</th></tr></thead>
+        <thead><tr><th>Audit Date</th><th>Expected</th><th>Actual</th><th>Missing</th><th>Damaged</th><th>Result</th><th>Remarks</th><th>Audited By</th></tr></thead>
         <tbody>
-        <?php if (!$audits): ?><tr class="empty-row"><td colspan="4">No audit history.</td></tr><?php endif; ?>
+        <?php if (!$audits): ?><tr class="empty-row"><td colspan="8">No audit history.</td></tr><?php endif; ?>
         <?php foreach ($audits as $au): ?>
             <tr>
                 <td><?= formatDate($au['audit_date']) ?></td>
+                <td><?= $au['expected_quantity'] !== null ? (int) $au['expected_quantity'] : '—' ?></td>
+                <td><?= $au['actual_quantity'] !== null ? (int) $au['actual_quantity'] : '—' ?></td>
+                <td><?= $au['missing_quantity'] !== null ? (int) $au['missing_quantity'] : '—' ?></td>
+                <td><?= $au['damaged_quantity'] !== null ? (int) $au['damaged_quantity'] : '—' ?></td>
                 <td><?= statusBadge($au['result']) ?></td>
                 <td><?= e($au['remarks'] ?? '—') ?></td>
                 <td><?= e($au['audited_by_name'] ?? '—') ?></td>
@@ -199,12 +208,13 @@ include __DIR__ . '/../../includes/layout/header.php';
 <div id="tab-disposals" class="tab-panel">
     <div class="table-wrap">
     <table>
-        <thead><tr><th>Requested</th><th>Method</th><th>Reason</th><th>Status</th><th>Approved By</th><th>Disposal Date</th></tr></thead>
+        <thead><tr><th>Requested</th><th>Qty</th><th>Method</th><th>Reason</th><th>Status</th><th>Approved By</th><th>Disposal Date</th></tr></thead>
         <tbody>
-        <?php if (!$disposals): ?><tr class="empty-row"><td colspan="6">No disposal history.</td></tr><?php endif; ?>
+        <?php if (!$disposals): ?><tr class="empty-row"><td colspan="7">No disposal history.</td></tr><?php endif; ?>
         <?php foreach ($disposals as $ds): ?>
             <tr>
                 <td><?= formatDate($ds['request_date']) ?></td>
+                <td><?= (int) $ds['quantity'] ?></td>
                 <td><?= e(ucfirst($ds['method'])) ?></td>
                 <td><?= e($ds['reason']) ?></td>
                 <td><?= statusBadge($ds['status']) ?></td>

@@ -19,7 +19,7 @@ $totalValue = 0;
 $assetDetails = []; // grouping-key => [asset rows], backs the clickable Asset Count for by_department/by_category/by_status
 
 if ($report === 'by_department') {
-    $sql = "SELECT d.department_id, d.department_name, COUNT(a.asset_id) AS asset_count, COALESCE(SUM(a.purchase_cost),0) AS total_value
+    $sql = "SELECT d.department_id, d.department_name, COUNT(a.asset_id) AS asset_count, COALESCE(SUM(a.quantity),0) AS total_quantity, COALESCE(SUM(a.quantity * a.purchase_cost),0) AS total_value
             FROM departments d LEFT JOIN assets a ON a.department_id = d.department_id
             " . ($isHead ? 'WHERE d.department_id = :dept' : '') . "
             GROUP BY d.department_id, d.department_name ORDER BY d.department_name";
@@ -28,7 +28,7 @@ if ($report === 'by_department') {
     $rows = $stmt->fetchAll();
 
     // Same scoping as the aggregate query above, so the assets shown per row always match that row's Asset Count.
-    $detailSql = "SELECT a.asset_id, a.name, a.status, a.department_id, a.purchase_cost, c.category_name, l.location_name
+    $detailSql = "SELECT a.asset_id, a.name, a.status, a.department_id, a.quantity, a.purchase_cost, c.category_name, l.location_name
                   FROM assets a
                   LEFT JOIN categories c ON c.category_id = a.category_id
                   LEFT JOIN locations l ON l.location_id = a.location_id
@@ -41,14 +41,14 @@ if ($report === 'by_department') {
     }
 } elseif ($report === 'by_category') {
     $where = $isHead ? 'WHERE a.department_id = :dept' : '';
-    $sql = "SELECT c.category_id, c.category_name, COUNT(a.asset_id) AS asset_count, COALESCE(SUM(a.purchase_cost),0) AS total_value
+    $sql = "SELECT c.category_id, c.category_name, COUNT(a.asset_id) AS asset_count, COALESCE(SUM(a.quantity),0) AS total_quantity, COALESCE(SUM(a.quantity * a.purchase_cost),0) AS total_value
             FROM categories c LEFT JOIN assets a ON a.category_id = c.category_id $where
             GROUP BY c.category_id, c.category_name ORDER BY c.category_name";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($isHead ? ['dept' => $deptId] : []);
     $rows = $stmt->fetchAll();
 
-    $detailSql = "SELECT a.asset_id, a.name, a.status, a.category_id, c.category_name, l.location_name
+    $detailSql = "SELECT a.asset_id, a.name, a.status, a.category_id, a.quantity, a.purchase_cost, c.category_name, l.location_name
                   FROM assets a
                   LEFT JOIN categories c ON c.category_id = a.category_id
                   LEFT JOIN locations l ON l.location_id = a.location_id
@@ -60,14 +60,14 @@ if ($report === 'by_department') {
     }
 } elseif ($report === 'by_status') {
     $where = $isHead ? 'WHERE department_id = :dept' : '';
-    $sql = "SELECT status, COUNT(*) AS asset_count, COALESCE(SUM(purchase_cost),0) AS total_value
+    $sql = "SELECT status, COUNT(*) AS asset_count, COALESCE(SUM(quantity),0) AS total_quantity, COALESCE(SUM(quantity * purchase_cost),0) AS total_value
             FROM assets $where GROUP BY status";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($isHead ? ['dept' => $deptId] : []);
     $rows = $stmt->fetchAll();
 
     $detailWhere = $isHead ? 'WHERE a.department_id = :dept' : '';
-    $detailSql = "SELECT a.asset_id, a.name, a.status, c.category_name, l.location_name
+    $detailSql = "SELECT a.asset_id, a.name, a.status, a.quantity, a.purchase_cost, c.category_name, l.location_name
                   FROM assets a
                   LEFT JOIN categories c ON c.category_id = a.category_id
                   LEFT JOIN locations l ON l.location_id = a.location_id
@@ -122,14 +122,16 @@ function renderAssetCountCell(string $modalId, int $count, array $assets): strin
     $html .= '<div class="modal-overlay" id="' . e($modalId) . '">';
     $html .= '<div class="modal">';
     $html .= '<div class="modal-header"><h3>Assets (' . $count . ')</h3><button type="button" class="modal-close" data-modal-close>&times;</button></div>';
-    $html .= '<div class="modal-body"><div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Location</th><th>Status</th></tr></thead><tbody>';
+    $html .= '<div class="modal-body"><div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Location</th><th>Qty</th><th>Status</th><th>Value</th></tr></thead><tbody>';
     foreach ($assets as $a) {
         $html .= '<tr>'
                . '<td>#' . (int) $a['asset_id'] . '</td>'
                . '<td>' . e($a['name']) . '</td>'
                . '<td>' . e($a['category_name'] ?? '—') . '</td>'
                . '<td>' . e($a['location_name'] ?? '—') . '</td>'
+               . '<td>' . (int) $a['quantity'] . '</td>'
                . '<td>' . statusBadge($a['status']) . '</td>'
+               . '<td>' . formatMoney($a['quantity'] * $a['purchase_cost']) . '</td>'
                . '</tr>';
     }
     $html .= '</tbody></table></div></div>';
@@ -161,15 +163,16 @@ function renderAssetDetailModal(string $modalId, int $count, array $assets): str
     $html = '<div class="modal-overlay" id="' . e($modalId) . '">';
     $html .= '<div class="modal">';
     $html .= '<div class="modal-header"><h3>Assets (' . $count . ')</h3><button type="button" class="modal-close" data-modal-close>&times;</button></div>';
-    $html .= '<div class="modal-body"><div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Location</th><th>Status</th><th>Value</th></tr></thead><tbody>';
+    $html .= '<div class="modal-body"><div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Location</th><th>Qty</th><th>Status</th><th>Value</th></tr></thead><tbody>';
     foreach ($assets as $a) {
         $html .= '<tr>'
                . '<td>#' . (int) $a['asset_id'] . '</td>'
                . '<td>' . e($a['name']) . '</td>'
                . '<td>' . e($a['category_name'] ?? '—') . '</td>'
                . '<td>' . e($a['location_name'] ?? '—') . '</td>'
+               . '<td>' . (int) $a['quantity'] . '</td>'
                . '<td>' . statusBadge($a['status']) . '</td>'
-               . '<td>' . formatMoney($a['purchase_cost']) . '</td>'
+               . '<td>' . formatMoney($a['quantity'] * $a['purchase_cost']) . '</td>'
                . '</tr>';
     }
     $html .= '</tbody></table></div></div>';
@@ -218,9 +221,9 @@ include __DIR__ . '/../../includes/layout/header.php';
 <div class="table-wrap">
 <table>
     <?php if ($report === 'by_department'): ?>
-        <thead><tr><th>Department</th><th>Asset Count</th><th>Total Value</th></tr></thead>
+        <thead><tr><th>Department</th><th>Asset Records</th><th>Total Quantity</th><th>Total Value</th></tr></thead>
         <tbody>
-        <?php if (!$rows): ?><tr class="empty-row"><td colspan="3">No data available.</td></tr><?php endif; ?>
+        <?php if (!$rows): ?><tr class="empty-row"><td colspan="4">No data available.</td></tr><?php endif; ?>
         <?php $departmentModals = []; ?>
         <?php foreach ($rows as $r): ?>
             <?php
@@ -234,28 +237,30 @@ include __DIR__ . '/../../includes/layout/header.php';
             <tr<?= $deptRowAttrs ?>>
                 <td><?= e($r['department_name']) ?></td>
                 <td><?= renderAssetCountTrigger($deptModalId, $deptCount) ?></td>
+                <td><?= (int) $r['total_quantity'] ?></td>
                 <td><?= formatMoney($r['total_value']) ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>
     <?php elseif ($report === 'by_category'): ?>
-        <thead><tr><th>Category</th><th>Asset Count</th><th>Total Value</th></tr></thead>
+        <thead><tr><th>Category</th><th>Asset Records</th><th>Total Quantity</th><th>Total Value</th></tr></thead>
         <tbody>
-        <?php if (!$rows): ?><tr class="empty-row"><td colspan="3">No data available.</td></tr><?php endif; ?>
+        <?php if (!$rows): ?><tr class="empty-row"><td colspan="4">No data available.</td></tr><?php endif; ?>
         <?php foreach ($rows as $r): ?>
             <tr>
                 <td><?= e($r['category_name']) ?></td>
                 <td><?= renderAssetCountCell('assetsModal_by_category_' . $r['category_id'], (int) $r['asset_count'], $assetDetails[$r['category_id']] ?? []) ?></td>
+                <td><?= (int) $r['total_quantity'] ?></td>
                 <td><?= formatMoney($r['total_value']) ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>
     <?php elseif ($report === 'by_status'): ?>
-        <thead><tr><th>Status</th><th>Asset Count</th><th>Total Value</th></tr></thead>
+        <thead><tr><th>Status</th><th>Asset Records</th><th>Total Quantity</th><th>Total Value</th></tr></thead>
         <tbody>
-        <?php if (!$rows): ?><tr class="empty-row"><td colspan="3">No data available.</td></tr><?php endif; ?>
+        <?php if (!$rows): ?><tr class="empty-row"><td colspan="4">No data available.</td></tr><?php endif; ?>
         <?php foreach ($rows as $r): ?>
-            <tr><td><?= statusBadge($r['status']) ?></td><td><?= renderAssetCountCell('assetsModal_status_' . $r['status'], (int) $r['asset_count'], $assetDetails[$r['status']] ?? []) ?></td><td><?= formatMoney($r['total_value']) ?></td></tr>
+            <tr><td><?= statusBadge($r['status']) ?></td><td><?= renderAssetCountCell('assetsModal_status_' . $r['status'], (int) $r['asset_count'], $assetDetails[$r['status']] ?? []) ?></td><td><?= (int) $r['total_quantity'] ?></td><td><?= formatMoney($r['total_value']) ?></td></tr>
         <?php endforeach; ?>
         </tbody>
     <?php elseif ($report === 'maintenance_cost'): ?>

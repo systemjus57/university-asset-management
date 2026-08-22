@@ -8,7 +8,16 @@
 -- backing table. Per the agreed scope, this schema adds `locations` and
 -- `asset_audits`, plus full workflow tables `requisitions` and
 -- `asset_disposals`, and `settings` / `activity_logs` / `login_logs` to
--- support the admin Settings module. 15 tables total.
+-- support the admin Settings module. 18 tables total, including
+-- `buildings`, `password_resets`, and `notifications` added in later revisions.
+--
+-- Quantity model: assets are tracked as quantity-based records (an
+-- `assets` row can represent many identical physical units via its
+-- `quantity` column), not strictly one row per physical item. Location
+-- is a hierarchy of Department -> Building -> Floor -> Room, built from
+-- `buildings` + `locations` (locations.building is a legacy free-text
+-- column kept for backward compatibility; buildings.building_id is the
+-- source of truth going forward).
 -- =====================================================================
 
 CREATE DATABASE IF NOT EXISTS university_asset_management
@@ -76,15 +85,30 @@ CREATE TABLE categories (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- 5. locations  (physical location of an asset: building/room)
+-- 5a. buildings  (top of the physical location hierarchy)
+-- ---------------------------------------------------------------------
+CREATE TABLE buildings (
+    building_id    INT AUTO_INCREMENT PRIMARY KEY,
+    building_name  VARCHAR(100) NOT NULL,
+    campus         VARCHAR(100) NULL COMMENT 'nullable: this project is single-campus today',
+    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 5. locations  (physical location of an asset: building/floor/room)
 -- ---------------------------------------------------------------------
 CREATE TABLE locations (
     location_id    INT AUTO_INCREMENT PRIMARY KEY,
     location_name  VARCHAR(100) NOT NULL,
-    building       VARCHAR(100) NULL,
+    building       VARCHAR(100) NULL COMMENT 'legacy free-text, kept for compatibility; prefer building_id',
+    building_id    INT NULL,
+    floor          VARCHAR(50) NULL,
     room           VARCHAR(50) NULL,
     created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_locations_building FOREIGN KEY (building_id) REFERENCES buildings(building_id)
+        ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -98,7 +122,8 @@ CREATE TABLE assets (
     location_id      INT NULL,
     department_id    INT NULL COMMENT 'current custodian department',
     purchase_date    DATE NOT NULL,
-    purchase_cost    DECIMAL(12,2) NOT NULL,
+    purchase_cost    DECIMAL(12,2) NOT NULL COMMENT 'cost per unit',
+    quantity         INT NOT NULL DEFAULT 1 COMMENT 'total physical units this record represents',
     warranty_expiry  DATE NULL,
     status           ENUM('active','under_repair','disposed') NOT NULL DEFAULT 'active',
     description      TEXT NULL,
@@ -118,6 +143,7 @@ CREATE TABLE assets (
 CREATE TABLE asset_assigned (
     assign_id          INT AUTO_INCREMENT PRIMARY KEY,
     asset_id           INT NOT NULL,
+    quantity           INT NOT NULL DEFAULT 1,
     assigned_to        INT NOT NULL COMMENT 'department the asset is allocated to',
     assigned_user_id   INT NULL COMMENT 'specific staff custodian within the department',
     assigned_by        INT NOT NULL COMMENT 'user who processed the allocation',
@@ -143,6 +169,7 @@ CREATE TABLE asset_assigned (
 CREATE TABLE asset_transfers (
     transfer_id          INT AUTO_INCREMENT PRIMARY KEY,
     asset_id             INT NOT NULL,
+    quantity             INT NOT NULL DEFAULT 1,
     from_department_id   INT NULL,
     to_department_id     INT NOT NULL,
     transfer_date        DATE NOT NULL,
@@ -166,6 +193,7 @@ CREATE TABLE asset_transfers (
 CREATE TABLE asset_maintenance (
     maintenance_id      INT AUTO_INCREMENT PRIMARY KEY,
     asset_id             INT NOT NULL,
+    quantity             INT NOT NULL DEFAULT 1,
     issue_description    TEXT NOT NULL,
     reported_by          INT NOT NULL,
     reported_date        DATE NOT NULL,
@@ -187,6 +215,10 @@ CREATE TABLE asset_maintenance (
 CREATE TABLE asset_audits (
     audit_id     INT AUTO_INCREMENT PRIMARY KEY,
     asset_id     INT NOT NULL,
+    expected_quantity  INT NULL,
+    actual_quantity    INT NULL,
+    missing_quantity   INT NULL,
+    damaged_quantity   INT NULL,
     audited_by   INT NOT NULL,
     audit_date   DATE NOT NULL,
     result       ENUM('found','missing','damaged') NOT NULL,
@@ -232,6 +264,7 @@ CREATE TABLE requisitions (
 CREATE TABLE asset_disposals (
     disposal_id    INT AUTO_INCREMENT PRIMARY KEY,
     asset_id        INT NOT NULL,
+    quantity         INT NOT NULL DEFAULT 1,
     requested_by     INT NOT NULL,
     request_date      DATE NOT NULL,
     method             ENUM('sold','scrapped','donated','other') NOT NULL,
@@ -290,6 +323,43 @@ CREATE TABLE login_logs (
         ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- ---------------------------------------------------------------------
+-- 16. password_resets  (email OTP codes for the login page's "Forgot
+--     Password?" flow — modules/auth/login.php. One row per OTP request;
+--     never stores the code itself, only a password_hash() of it.)
+-- ---------------------------------------------------------------------
+CREATE TABLE password_resets (
+    reset_id     INT AUTO_INCREMENT PRIMARY KEY,
+    user_id      INT NOT NULL,
+    otp_hash     VARCHAR(255) NOT NULL,
+    expires_at   DATETIME NOT NULL,
+    attempts     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    verified_at  DATETIME NULL,
+    used_at      DATETIME NULL,
+    created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_password_resets_user FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 17. notifications  (persistent, per-user, read/unread — replaces the
+--     earlier non-persistent "compute on every page load" topbar bell)
+-- ---------------------------------------------------------------------
+CREATE TABLE notifications (
+    notification_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT NOT NULL,
+    title       VARCHAR(150) NOT NULL,
+    message     VARCHAR(255) NOT NULL,
+    type        VARCHAR(30) NOT NULL DEFAULT 'info',
+    module      VARCHAR(50) NULL,
+    related_id  INT NULL,
+    is_read     TINYINT(1) NOT NULL DEFAULT 0,
+    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    read_at     TIMESTAMP NULL,
+    CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- =====================================================================
@@ -331,14 +401,17 @@ INSERT INTO categories (category_name, description) VALUES
 ('Lab Equipment', 'Engineering and science laboratory equipment'),
 ('Vehicles', 'University-owned vehicles');
 
-INSERT INTO locations (location_name, building, room) VALUES
-('ICT Lab 1', 'Main Building', 'Room 201'),
-('ICT Store', 'Main Building', 'Room 105'),
-('Library Reading Hall', 'Library Building', 'Ground Floor'),
-('Finance Office', 'Admin Block', 'Room 12'),
-('Registrar Front Desk', 'Admin Block', 'Room 3'),
-('Engineering Workshop', 'Engineering Block', 'Workshop 1'),
-('HR Office', 'Admin Block', 'Room 20');
+INSERT INTO buildings (building_name) VALUES
+('Main Building'), ('Library Building'), ('Admin Block'), ('Engineering Block');
+
+INSERT INTO locations (location_name, building, building_id, room) VALUES
+('ICT Lab 1', 'Main Building', 1, 'Room 201'),
+('ICT Store', 'Main Building', 1, 'Room 105'),
+('Library Reading Hall', 'Library Building', 2, 'Ground Floor'),
+('Finance Office', 'Admin Block', 3, 'Room 12'),
+('Registrar Front Desk', 'Admin Block', 3, 'Room 3'),
+('Engineering Workshop', 'Engineering Block', 4, 'Workshop 1'),
+('HR Office', 'Admin Block', 3, 'Room 20');
 
 INSERT INTO assets (name, category_id, serial_no, location_id, department_id, purchase_date, purchase_cost, warranty_expiry, status, description) VALUES
 ('Dell Latitude 5420 Laptop',   1, 'SN-DL5420-001', 1, 1, '2023-02-10', 950.00,  '2026-02-10', 'active',      'Assigned to ICT lab instructors'),
